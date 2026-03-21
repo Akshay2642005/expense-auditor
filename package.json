@@ -1,0 +1,31 @@
+{
+  "name": "auditor",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "format:check": "turbo run format:check",
+    "format:fix": "turbo run format:fix",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rimraf node_modules"
+  },
+  "packageManager": "bun@1.2.13",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "turbo": "^2.8.20",
+    "typescript": "^5.9.3",
+    "@types/bun": "latest"
+  },
+  "module": "index.ts",
+  "type": "module",
+  "dependencies": {}
+}
+
