@@ -16,9 +16,11 @@ type Config struct {
 	Primary       Primary              `koanf:"primary" validate:"required"`
 	Server        ServerConfig         `koanf:"server" validate:"required"`
 	Database      DatabaseConfig       `koanf:"database" validate:"required"`
-	Integration   IntegrationConfig    `koanf:"integration" validate:"required"`
-	Auth          AuthConfig           `koanf:"auth" validate:"required"`
 	Redis         RedisConfig          `koanf:"redis" validate:"required"`
+	Auth          AuthConfig           `koanf:"auth" validate:"required"`
+	Integration   IntegrationConfig    `koanf:"integration" validate:"required"`
+	AI            AIConfig             `koanf:"ai" validate:"required"`
+	Storage       StorageConfig        `koanf:"storage" validate:"required"`
 	Observability *ObservabilityConfig `koanf:"observability"`
 }
 
@@ -27,10 +29,10 @@ type Primary struct {
 }
 
 type ServerConfig struct {
-	Port             string   `koanf:"port" validate:"required"`
-	ReadTimeout      int      `koanf:"read_timeout" validate:"required"`
-	WriteTimeout     int      `koanf:"write_timeout" validate:"required"`
-	IdleTimeout      int      `koanf:"idle_timeout" validate:"required"`
+	Port               string   `koanf:"port" validate:"required"`
+	ReadTimeout        int      `koanf:"read_timeout" validate:"required"`
+	WriteTimeout       int      `koanf:"write_timeout" validate:"required"`
+	IdleTimeout        int      `koanf:"idle_timeout" validate:"required"`
 	CORSAllowedOrigins []string `koanf:"cors_allowed_origins" validate:"required"`
 }
 
@@ -59,6 +61,18 @@ type AuthConfig struct {
 	WebhookSecret string `koanf:"webhook_secret" validate:"required"`
 }
 
+type AIConfig struct {
+	GeminiAPIKey          string `koanf:"gemini_api_key" validate:"required"`
+	DateMismatchThreshold int    `koanf:"date_mismatch_threshold" validate:"required"`
+}
+
+type StorageConfig struct {
+	GCSBucketName  string `koanf:"gcs_bucket_name" validate:"required"`
+	GCSProjectID   string `koanf:"gcs_project_id" validate:"required"`
+	GCSCredentials string `koanf:"gcs_credentials" validate:"required"`
+	MaxFileSizeMB  int    `koanf:"max_file_size_mb" validate:"required"`
+}
+
 func LoadConfig() (*Config, error) {
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Logger()
 	k := koanf.New(".")
@@ -80,6 +94,13 @@ func LoadConfig() (*Config, error) {
 	err = validate.Struct(mainConfig)
 	if err != nil {
 		logger.Fatal().Err(err).Msg("Configuration validation failed")
+	}
+
+	if mainConfig.AI.DateMismatchThreshold == 0 {
+		mainConfig.AI.DateMismatchThreshold = 7
+	}
+	if mainConfig.Storage.MaxFileSizeMB == 0 {
+		mainConfig.Storage.MaxFileSizeMB = 10
 	}
 
 	if mainConfig.Observability == nil {

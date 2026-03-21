@@ -27,6 +27,6 @@ func NewWelcomeEmailTask(to, firstName string) (*asynq.Task, error) {
 
 	return asynq.NewTask(TaskWelcome, payload,
 		asynq.MaxRetry(3),
-		asynq.Queue("default"),
+		asynq.Queue("email"),
 		asynq.Timeout(30*time.Second)), nil
 }

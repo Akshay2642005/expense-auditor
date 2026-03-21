@@ -1,6 +1,5 @@
 import { initContract } from "@ts-rest/core";
 import { ZHealthResponse } from "@auditor/zod";
-
 const c = initContract();
 
 export const healthContract = c.router({

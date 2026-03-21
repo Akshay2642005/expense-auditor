@@ -10,7 +10,7 @@ export default defineConfig({
     "process.env": process.env,
   },
   server: {
-    port: 3000,
+    port: 5173,
   },
   resolve: {
     alias: {

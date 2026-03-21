@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/email"
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
 )
 
 var emailClient *email.Client
@@ -47,5 +47,3 @@ func (j *JobService) handleWelcomeEmailTask(ctx context.Context, t *asynq.Task) 
 		Msg("Successfully sent welcome email")
 	return nil
 }
-
-

@@ -1,9 +1,9 @@
 package job
 
 import (
+	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
-	"github.com/Akshay2642005/expense-auditor/internal/config"
 )
 
 type JobService struct {
@@ -24,9 +24,9 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 		asynq.Config{
 			Concurrency: 10,
 			Queues: map[string]int{
-				"critical": 6, // Higher priority queue for important emails
-				"default":  3, // Default priority for most emails
-				"low":      1, // Lower priority for non-urgent emails
+				"critical": 6,
+				"email":    3,
+				"low":      1,
 			},
 		},
 	)
@@ -56,5 +56,3 @@ func (j *JobService) Stop() {
 	j.server.Shutdown()
 	j.Client.Close()
 }
-
-
