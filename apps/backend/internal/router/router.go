@@ -3,12 +3,12 @@ package router
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/Akshay2642005/expense-auditor/internal/handler"
 	"github.com/Akshay2642005/expense-auditor/internal/middleware"
 	"github.com/Akshay2642005/expense-auditor/internal/server"
 	"github.com/Akshay2642005/expense-auditor/internal/service"
+	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
 )
 
@@ -54,9 +54,8 @@ func NewRouter(s *server.Server, h *handler.Handlers, services *service.Services
 	registerSystemRoutes(router, h)
 
 	// register versioned routes
-	router.Group("/api/v1")
+	v1 := router.Group("/api/v1", middlewares.Auth.RequireAuth)
+	registerClaimRoutes(v1, h)
 
 	return router
 }
-
-

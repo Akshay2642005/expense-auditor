@@ -27,7 +27,7 @@ const (
 	ExpenseCategoryOther     ExpenseCategory = "other"
 )
 
-type RecieptFile struct {
+type ReceiptFile struct {
 	Base
 	FilePath     string `json:"filePath" db:"file_path"`
 	OriginalName string `json:"originalName" db:"original_name"`

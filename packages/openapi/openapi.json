@@ -89,6 +89,390 @@
           }
         }
       }
+    },
+    "/v1/claims": {
+      "post": {
+        "description": "Multipart form-data: file (JPG/PNG/PDF) + business_purpose + claimed_date + expense_category",
+        "summary": "Submit an expense claim",
+        "tags": [
+          "Claim"
+        ],
+        "parameters": [],
+        "operationId": "submitClaim",
+        "responses": {
+          "202": {
+            "description": "202",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "claimId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ocr_complete",
+                        "needs_review",
+                        "ocr_failed",
+                        "auditing",
+                        "approved",
+                        "flagged",
+                        "rejected"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "claimId",
+                    "status",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List all claims for the authenticated user",
+        "tags": [
+          "Claim"
+        ],
+        "parameters": [],
+        "operationId": "listClaims",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "userId": {
+                        "type": "string"
+                      },
+                      "receiptFileId": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "businessPurpose": {
+                        "type": "string"
+                      },
+                      "claimedDate": {
+                        "type": "string"
+                      },
+                      "expenseCategory": {
+                        "type": "string",
+                        "enum": [
+                          "meals",
+                          "transport",
+                          "lodging",
+                          "other"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "processing",
+                          "ocr_complete",
+                          "needs_review",
+                          "ocr_failed",
+                          "auditing",
+                          "approved",
+                          "flagged",
+                          "rejected"
+                        ]
+                      },
+                      "merchantName": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "receiptDate": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "amount": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "currency": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "dateMismatch": {
+                        "type": "boolean"
+                      },
+                      "ocrError": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "userId",
+                      "receiptFileId",
+                      "businessPurpose",
+                      "claimedDate",
+                      "expenseCategory",
+                      "status",
+                      "dateMismatch",
+                      "createdAt",
+                      "updatedAt"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/claims/{id}": {
+      "get": {
+        "summary": "Get a single claim by ID",
+        "tags": [
+          "Claim"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "getClaim",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string"
+                    },
+                    "receiptFileId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "businessPurpose": {
+                      "type": "string"
+                    },
+                    "claimedDate": {
+                      "type": "string"
+                    },
+                    "expenseCategory": {
+                      "type": "string",
+                      "enum": [
+                        "meals",
+                        "transport",
+                        "lodging",
+                        "other"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ocr_complete",
+                        "needs_review",
+                        "ocr_failed",
+                        "auditing",
+                        "approved",
+                        "flagged",
+                        "rejected"
+                      ]
+                    },
+                    "merchantName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "receiptDate": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "amount": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dateMismatch": {
+                      "type": "boolean"
+                    },
+                    "ocrError": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "userId",
+                    "receiptFileId",
+                    "businessPurpose",
+                    "claimedDate",
+                    "expenseCategory",
+                    "status",
+                    "dateMismatch",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "info": {

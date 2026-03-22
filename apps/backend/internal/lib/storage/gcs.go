@@ -15,8 +15,7 @@ type GCSClient struct {
 }
 
 func NewGCSClient(
-	ctx context.Context, client *storage.Client,
-	bucketName string, credentialsPath string,
+	ctx context.Context, bucketName string, credentialsPath string,
 ) (*GCSClient, error) {
 	var opts []option.ClientOption
 

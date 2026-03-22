@@ -57,8 +57,7 @@ type IntegrationConfig struct {
 	ResendAPIKey string `koanf:"resend_api_key" validate:"required"`
 }
 type AuthConfig struct {
-	SecretKey     string `koanf:"secret_key" validate:"required"`
-	WebhookSecret string `koanf:"webhook_secret" validate:"required"`
+	SecretKey string `koanf:"secret_key" validate:"required"`
 }
 
 type AIConfig struct {

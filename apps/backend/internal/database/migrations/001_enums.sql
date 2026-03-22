@@ -1,5 +1,3 @@
-
-
 CREATE TYPE claim_status AS ENUM (
     'pending',
     'processing',

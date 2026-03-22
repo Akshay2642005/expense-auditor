@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// JobService manages asynq client and server lifecycle.
 type JobService struct {
 	Client *asynq.Client
 	server *asynq.Server
@@ -15,9 +16,7 @@ type JobService struct {
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 	redisAddr := cfg.Redis.Address
 
-	client := asynq.NewClient(asynq.RedisClientOpt{
-		Addr: redisAddr,
-	})
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})
 
 	server := asynq.NewServer(
 		asynq.RedisClientOpt{Addr: redisAddr},
@@ -25,7 +24,7 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 			Concurrency: 10,
 			Queues: map[string]int{
 				"critical": 6,
-				"email":    3,
+				"default":  3,
 				"low":      1,
 			},
 		},
@@ -39,20 +38,16 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 }
 
 func (j *JobService) Start() error {
-	// Register task handlers
 	mux := asynq.NewServeMux()
 	mux.HandleFunc(TaskWelcome, j.handleWelcomeEmailTask)
+	mux.HandleFunc(TaskOCRReceipt, j.handleOCRReceiptTask)
 
-	j.logger.Info().Msg("Starting background job server")
-	if err := j.server.Start(mux); err != nil {
-		return err
-	}
-
-	return nil
+	j.logger.Info().Msg("starting background job server")
+	return j.server.Start(mux)
 }
 
 func (j *JobService) Stop() {
-	j.logger.Info().Msg("Stopping background job server")
+	j.logger.Info().Msg("stopping background job server")
 	j.server.Shutdown()
 	j.Client.Close()
 }

@@ -24,7 +24,7 @@ export const useApiClient = ({ isBlob = false }: { isBlob?: boolean } = {}) => {
       "Content-Type": "application/json",
     },
     api: async ({ path, method, headers, body }) => {
-      const token = await getToken({ template: "custom" });
+      const token = await getToken();
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const makeRequest = async (retryCount = 0): Promise<any> => {

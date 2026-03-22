@@ -8,7 +8,7 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-const TaskOCTReceipt = "receipt:ocr"
+const TaskOCRReceipt = "receipt:ocr"
 
 type OCRPayload struct {
 	ClaimID     uuid.UUID `json:"claim_id"`
@@ -32,7 +32,7 @@ func NewOCRReceiptTask(
 	}
 
 	return asynq.NewTask(
-		TaskOCTReceipt,
+		TaskOCRReceipt,
 		payload,
 		asynq.MaxRetry(3),
 		asynq.Queue("critical"),

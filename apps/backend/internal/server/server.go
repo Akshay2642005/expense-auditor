@@ -9,7 +9,9 @@ import (
 
 	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/Akshay2642005/expense-auditor/internal/database"
+	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/job"
+	gcslib "github.com/Akshay2642005/expense-auditor/internal/lib/storage"
 	loggerPkg "github.com/Akshay2642005/expense-auditor/internal/logger"
 	"github.com/newrelic/go-agent/v3/integrations/nrredis-v9"
 	"github.com/redis/go-redis/v9"
@@ -22,6 +24,8 @@ type Server struct {
 	LoggerService *loggerPkg.LoggerService
 	DB            *database.Database
 	Redis         *redis.Client
+	GCS           *gcslib.GCSClient
+	Gemini        *gemini.Client
 	httpServer    *http.Server
 	Job           *job.JobService
 }
@@ -48,8 +52,25 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerPkg.Lo
 		logger.Error().Err(err).Msg("Failed to connect to Redis, continuing without Redis")
 	}
 
+	gcsClient, err := gcslib.NewGCSClient(
+		context.Background(),
+		cfg.Storage.GCSBucketName,
+		cfg.Storage.GCSCredentials,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialise GCS client: %w", err)
+	}
+	logger.Info().Str("bucket", cfg.Storage.GCSBucketName).Msg("connected to GCS")
+
+	geminiClient, err := gemini.NewClient(context.Background(), cfg.AI.GeminiAPIKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialise Gemini client: %w", err)
+	}
+	logger.Info().Msg("gemini client initialised")
+
 	jobService := job.NewJobService(logger, cfg)
 	jobService.InitHandlers(cfg, logger)
+	jobService.InitOCRHandlers(geminiClient, gcsClient, db.Pool, cfg.AI.DateMismatchThreshold)
 
 	if err := jobService.Start(); err != nil {
 		return nil, err
@@ -62,12 +83,15 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerPkg.Lo
 	} else {
 		logger.Info().Msg("Database migrations ran successfully")
 	}
+
 	server := &Server{
 		Config:        cfg,
 		Logger:        logger,
 		LoggerService: loggerService,
 		DB:            db,
 		Redis:         redisClient,
+		GCS:           gcsClient,
+		Gemini:        geminiClient,
 		Job:           jobService,
 	}
 

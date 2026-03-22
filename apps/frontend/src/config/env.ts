@@ -8,7 +8,7 @@ const envVarsSchema = z.object({
   VITE_ENV: z.enum(["production", "development", "local"]).default("local"),
 });
 
-const parseResult = envVarsSchema.safeParse(process.env);
+const parseResult = envVarsSchema.safeParse(import.meta.env);
 
 if (!parseResult.success) {
   console.error(

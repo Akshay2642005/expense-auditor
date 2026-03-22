@@ -1,125 +1,71 @@
 package gemini
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
-	"time"
+
+	"google.golang.org/genai"
 )
 
-const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-
+// Client wraps the unified Google Gen AI SDK.
 type Client struct {
-	apiKey     string
-	httpClient *http.Client
+	gc *genai.Client
 }
 
-func NewClient(apiKey string) *Client {
-	return &Client{
-		apiKey: apiKey,
-		httpClient: &http.Client{
-			Timeout: 60 * time.Second,
-		},
+// NewClient creates a persistent Gemini client using google.golang.org/genai.
+func NewClient(ctx context.Context, apiKey string) (*Client, error) {
+	gc, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: apiKey,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("gemini: create client: %w", err)
 	}
+	return &Client{gc: gc}, nil
 }
 
-type geminiRequest struct {
-	Contents []geminiContent `json:"contents"`
-}
-
-type geminiContent struct {
-	Parts []geminiPart `json:"parts"`
-}
-
-type geminiPart struct {
-	Text       string      `json:"text,omitempty"`
-	InlineData *inlineData `json:"inline_data,omitempty"`
-}
-
-type inlineData struct {
-	MIMEType string `json:"mime_type"`
-	Data     string `json:"data"`
-}
-
-type geminiResponse struct {
-	Candidates []struct {
-		Content struct {
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
-		} `json:"content"`
-	} `json:"candidates"`
-	Error *struct {
-		Message string `json:"message"`
-		Code    int    `json:"code"`
-	} `json:"error"`
-}
-
+// ExtractReceiptData sends an image to Gemini Flash and parses the structured OCR output.
 func (c *Client) ExtractReceiptData(ctx context.Context, imageData []byte, mimeType string) (*OCRResult, error) {
-	encoded := base64.StdEncoding.EncodeToString(imageData)
-
-	body := geminiRequest{
-		Contents: []geminiContent{
-			{
-				Parts: []geminiPart{
-					{
-						InlineData: &inlineData{
-							MIMEType: mimeType,
-							Data:     encoded,
-						},
+	contents := []*genai.Content{
+		{
+			Role: "user",
+			Parts: []*genai.Part{
+				{
+					InlineData: &genai.Blob{
+						MIMEType: mimeType,
+						Data:     imageData,
 					},
-					{Text: ocrPrompt},
 				},
+				{Text: ocrPrompt},
 			},
 		},
 	}
 
-	rawBody, err := json.Marshal(body)
+	resp, err := c.gc.Models.GenerateContent(
+		ctx,
+		"gemini-2.5-flash",
+		contents,
+		&genai.GenerateContentConfig{
+			ResponseMIMEType: "application/json",
+		},
+	)
 	if err != nil {
-		return nil, fmt.Errorf("gemini: marshal request: %w", err)
+		return nil, fmt.Errorf("gemini: generate content: %w", err)
 	}
 
-	url := fmt.Sprintf("%s?key=%s", geminiEndpoint, c.apiKey)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(rawBody))
-	if err != nil {
-		return nil, fmt.Errorf("gemini: build request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("gemini: http call: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("gemini: read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini: unexpected status %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	var gr geminiResponse
-	if err := json.Unmarshal(respBody, &gr); err != nil {
-		return nil, fmt.Errorf("gemini: unmarshal response: %w", err)
-	}
-
-	if gr.Error != nil {
-		return nil, fmt.Errorf("gemini: API error %d: %s", gr.Error.Code, gr.Error.Message)
-	}
-
-	if len(gr.Candidates) == 0 || len(gr.Candidates[0].Content.Parts) == 0 {
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
 		return nil, fmt.Errorf("gemini: empty candidates in response")
 	}
 
-	text := strings.TrimSpace(gr.Candidates[0].Content.Parts[0].Text)
+	// Collect all text parts from the first candidate.
+	var sb strings.Builder
+	for _, part := range resp.Candidates[0].Content.Parts {
+		sb.WriteString(part.Text)
+	}
+
+	text := strings.TrimSpace(sb.String())
+	// Safety net — strip any accidental markdown fences.
 	text = strings.TrimPrefix(text, "```json")
 	text = strings.TrimPrefix(text, "```")
 	text = strings.TrimSuffix(text, "```")
