@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Receipt - Skyline Bistro</title>
+    <style>
+      :root {
+        --paper: #f7f3ea;
+        --ink: #1c1c1c;
+        --muted: #6b6b6b;
+        --rule: #c9c3b6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: #111;
+        color: var(--ink);
+        font-family: "Courier New", Courier, monospace;
+      }
+      .stage {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 32px;
+      }
+      .receipt {
+        width: 360px;
+        background: var(--paper);
+        border: 1px solid #e0d8c8;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+        padding: 20px 18px 22px;
+      }
+      .center { text-align: center; }
+      .title { font-size: 18px; letter-spacing: 1px; margin-bottom: 4px; }
+      .sub { font-size: 12px; color: var(--muted); }
+      .rule { border-top: 1px dashed var(--rule); margin: 14px 0; }
+      .row { display: flex; justify-content: space-between; align-items: baseline; }
+      .row + .row { margin-top: 6px; }
+      .item { font-size: 13px; }
+      .qty { color: var(--muted); font-size: 12px; }
+      .total { font-weight: 700; font-size: 15px; }
+      .foot { font-size: 11px; color: var(--muted); line-height: 1.4; }
+      .badge {
+        display: inline-block;
+        border: 1px solid var(--ink);
+        padding: 2px 6px;
+        font-size: 11px;
+        letter-spacing: 0.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="receipt" role="img" aria-label="Receipt from Skyline Bistro">
+        <div class="center">
+          <div class="title">SKYLINE BISTRO</div>
+          <div class="sub">125 King St W, Toronto, ON</div>
+          <div class="sub">(416) 555-0142</div>
+        </div>
+
+        <div class="rule"></div>
+
+        <div class="row">
+          <div class="item">Receipt</div>
+          <div class="item">#SB-18492</div>
+        </div>
+        <div class="row">
+          <div class="item">Date</div>
+          <div class="item">Mar 12, 2026</div>
+        </div>
+        <div class="row">
+          <div class="item">Time</div>
+          <div class="item">8:14 PM</div>
+        </div>
+        <div class="row">
+          <div class="item">Server</div>
+          <div class="item">Maya</div>
+        </div>
+
+        <div class="rule"></div>
+
+        <div class="row">
+          <div class="item">Seared Salmon Bowl</div>
+          <div class="item">28.50</div>
+        </div>
+        <div class="row">
+          <div class="qty">1 x</div>
+          <div></div>
+        </div>
+
+        <div class="row">
+          <div class="item">Ribeye Steak</div>
+          <div class="item">42.00</div>
+        </div>
+        <div class="row">
+          <div class="qty">1 x</div>
+          <div></div>
+        </div>
+
+        <div class="row">
+          <div class="item">Truffle Fries</div>
+          <div class="item">12.50</div>
+        </div>
+        <div class="row">
+          <div class="qty">1 x</div>
+          <div></div>
+        </div>
+
+        <div class="row">
+          <div class="item">Sparkling Water</div>
+          <div class="item">6.50</div>
+        </div>
+        <div class="row">
+          <div class="qty">1 x</div>
+          <div></div>
+        </div>
+
+        <div class="row">
+          <div class="item">Dessert Sampler</div>
+          <div class="item">18.00</div>
+        </div>
+        <div class="row">
+          <div class="qty">1 x</div>
+          <div></div>
+        </div>
+
+        <div class="rule"></div>
+
+        <div class="row">
+          <div class="item">Subtotal</div>
+          <div class="item">107.50</div>
+        </div>
+        <div class="row">
+          <div class="item">HST (13%)</div>
+          <div class="item">13.98</div>
+        </div>
+        <div class="row">
+          <div class="item">Tip</div>
+          <div class="item">18.00</div>
+        </div>
+
+        <div class="rule"></div>
+
+        <div class="row total">
+          <div class="item">Total (CAD)</div>
+          <div class="item">139.48</div>
+        </div>
+
+        <div class="rule"></div>
+
+        <div class="center">
+          <span class="badge">PAID</span>
+          <div class="foot" style="margin-top: 10px;">
+            VISA **** 4412 | Auth: 8G4K21
+          </div>
+          <div class="foot">Thank you for dining with us.</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

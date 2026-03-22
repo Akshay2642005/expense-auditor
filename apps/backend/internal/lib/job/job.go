@@ -39,8 +39,8 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 
 func (j *JobService) Start() error {
 	mux := asynq.NewServeMux()
-	mux.HandleFunc(TaskWelcome, j.handleWelcomeEmailTask)
 	mux.HandleFunc(TaskOCRReceipt, j.handleOCRReceiptTask)
+	mux.HandleFunc(TaskPolicyIngestion, j.handlePolicyIngestionTask)
 
 	j.logger.Info().Msg("starting background job server")
 	return j.server.Start(mux)

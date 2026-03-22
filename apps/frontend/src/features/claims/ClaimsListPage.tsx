@@ -1,20 +1,43 @@
-import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
+import { useAuth, useClerk, useOrganization, useUser } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import {
-  CheckCircle2, Clock, AlertTriangle, XCircle,
-  Plus, RefreshCw, Receipt, LogOut, User,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
+  Plus,
+  RefreshCw,
+  Receipt,
+  LogOut,
+  User,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  DropdownMenu, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { API_URL } from "@/config/env";
 import type { ClaimResponse } from "@auditor/zod";
@@ -58,8 +81,12 @@ async function fetchClaims(token: string | null): Promise<ClaimResponse[]> {
 export function ClaimsListPage() {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const { organization } = useOrganization();
   const { signOut } = useClerk();
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const { data: claims = [], isLoading } = useQuery({
     queryKey: ["claims"],
@@ -74,6 +101,22 @@ export function ClaimsListPage() {
     navigate("/login", { replace: true });
   };
 
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!organization || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      await organization.inviteMember({ emailAddress: inviteEmail.trim(), role: "org:member" });
+      toast.success(`Invite sent to ${inviteEmail.trim()}`);
+      setInviteEmail("");
+      setInviteOpen(false);
+    } catch {
+      toast.error("Failed to send invite.");
+    } finally {
+      setInviting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky header */}
@@ -84,7 +127,9 @@ export function ClaimsListPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
               <Receipt className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">Expense Auditor</span>
+            <span className="text-sm font-semibold tracking-tight">
+              Expense Auditor
+            </span>
           </div>
 
           {/* Actions */}
@@ -96,6 +141,54 @@ export function ClaimsListPage() {
 
             <ThemeToggle />
 
+            {/* Admin-only Policy Button */}
+            {orgRole === "org:admin" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-xs"
+                onClick={() => navigate("/admin/policy")}
+              >
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Policy Admin
+              </Button>
+            )}
+
+            {/* Admin-only Invite Button */}
+            {orgRole === "org:admin" && (
+              <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                    <Users className="h-3.5 w-3.5" />
+                    Invite
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Invite team member</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleInvite} className="space-y-4 pt-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="invite-email">Email address</Label>
+                      <Input
+                        id="invite-email"
+                        type="email"
+                        placeholder="colleague@company.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        required
+                        disabled={inviting}
+                        autoFocus
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={inviting || !inviteEmail.trim()}>
+                      {inviting ? "Sending…" : "Send invite"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+
             {/* User dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -104,7 +197,10 @@ export function ClaimsListPage() {
                   aria-label="Account menu"
                 >
                   <Avatar className="h-8 w-8 cursor-pointer">
-                    <AvatarImage src={user?.imageUrl} alt={user?.fullName ?? ""} />
+                    <AvatarImage
+                      src={user?.imageUrl}
+                      alt={user?.fullName ?? ""}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                       {initials(user?.firstName, user?.lastName)}
                     </AvatarFallback>
@@ -123,12 +219,16 @@ export function ClaimsListPage() {
                     </p>
                   </div>
                 </DropdownMenuLabel>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   className="text-destructive focus:text-destructive"
@@ -170,7 +270,9 @@ export function ClaimsListPage() {
           <div className="space-y-3">
             {claims.map((claim) => {
               const Icon = statusIcon[claim.status] ?? Clock;
-              const color = statusColor[claim.status] ?? "text-muted-foreground";
+              const color =
+                statusColor[claim.status] ?? "text-muted-foreground";
+
               return (
                 <Card
                   key={claim.id}
@@ -178,7 +280,12 @@ export function ClaimsListPage() {
                   onClick={() => navigate(`/claims/${claim.id}`)}
                 >
                   <CardContent className="flex items-center gap-4 py-4">
-                    <div className={cn("shrink-0 rounded-full bg-muted p-2", color)}>
+                    <div
+                      className={cn(
+                        "shrink-0 rounded-full bg-muted p-2",
+                        color
+                      )}
+                    >
                       <Icon className="h-4 w-4" />
                     </div>
 
@@ -188,8 +295,12 @@ export function ClaimsListPage() {
                       </p>
                       <p className="text-xs capitalize text-muted-foreground">
                         {claim.expenseCategory} ·{" "}
-                        {new Date(claim.claimedDate).toLocaleDateString(undefined, {
-                          year: "numeric", month: "short", day: "numeric",
+                        {new Date(
+                          claim.claimedDate
+                        ).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
                         })}
                       </p>
                     </div>
@@ -197,10 +308,14 @@ export function ClaimsListPage() {
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       {claim.amount != null && (
                         <span className="text-sm font-semibold tabular-nums">
-                          {claim.currency ?? ""} {Number(claim.amount).toFixed(2)}
+                          {claim.currency ?? ""}{" "}
+                          {Number(claim.amount).toFixed(2)}
                         </span>
                       )}
-                      <Badge variant="outline" className="text-xs capitalize">
+                      <Badge
+                        variant="outline"
+                        className="text-xs capitalize"
+                      >
                         {claim.status.replace(/_/g, " ")}
                       </Badge>
                     </div>

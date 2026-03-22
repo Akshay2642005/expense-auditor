@@ -1,5 +1,5 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
-import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
   AlertCircle, CheckCircle2, Clock, Eye,
@@ -52,9 +52,11 @@ async function fetchClaim(id: string, token: string | null): Promise<ClaimRespon
 export function ClaimStatusPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { getToken, orgRole } = useAuth();
+  const queryClient = useQueryClient();
 
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [recomputeLoading, setRecomputeLoading] = useState(false);
 
   const { data: claim, isLoading, isError } = useQuery({
     queryKey: ["claim", id],
@@ -99,6 +101,28 @@ export function ClaimStatusPage() {
       });
     } finally {
       setReceiptLoading(false);
+    }
+  };
+
+  const handleRecomputePolicy = async () => {
+    if (!claim) return;
+    setRecomputeLoading(true);
+    try {
+      const token = await getToken();
+      await axios.post(
+        `${API_URL}/api/v1/admin/claims/${claim.id}/recompute-policy`,
+        {},
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      await queryClient.invalidateQueries({ queryKey: ["claim", id] });
+      await queryClient.invalidateQueries({ queryKey: ["claims"] });
+      toast.success("Policy match re-run");
+    } catch {
+      toast.error("Could not re-run policy match", {
+        description: "Please try again.",
+      });
+    } finally {
+      setRecomputeLoading(false);
     }
   };
 
@@ -160,6 +184,19 @@ export function ClaimStatusPage() {
             )}
           </CardContent>
         </Card>
+        {orgRole === "org:admin" && (
+          <div className="flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRecomputePolicy}
+              disabled={recomputeLoading}
+            >
+              <RefreshCw className={cn("mr-2 h-4 w-4", recomputeLoading && "animate-spin")} />
+              Re-run Policy Match
+            </Button>
+          </div>
+        )}
 
         {/* Extracted receipt data */}
         {(claim.merchantName || claim.amount != null) && (

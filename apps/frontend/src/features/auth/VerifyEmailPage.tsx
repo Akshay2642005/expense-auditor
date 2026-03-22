@@ -37,7 +37,7 @@ export function VerifyEmailPage() {
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         toast.success("Email verified — welcome aboard!");
-        navigate("/");
+        navigate("/create-org");
       } else {
         toast.error("Verification incomplete", {
           description: "Please check the code and try again.",

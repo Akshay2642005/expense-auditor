@@ -1,5 +1,5 @@
-import { useClerk, useUser } from "@clerk/clerk-react";
-import { ArrowLeft, Camera, LogOut, Mail, ShieldCheck, User } from "lucide-react";
+import { useClerk, useOrganization, useOrganizationList, useUser } from "@clerk/clerk-react";
+import { ArrowLeft, Building2, Camera, Copy, LogOut, Mail, Plus, ShieldCheck, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -23,6 +23,8 @@ function initials(first?: string | null, last?: string | null) {
 export function ProfilePage() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { organization, membership } = useOrganization();
+  const { createOrganization, setActive, isLoaded: orgListLoaded } = useOrganizationList();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -30,6 +32,12 @@ export function ProfilePage() {
   const [lastName, setLastName] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
+  const [creatingOrg, setCreatingOrg] = useState(false);
+
+  const isAdmin = membership?.role === "org:admin";
 
   useEffect(() => {
     if (user) {
@@ -83,6 +91,37 @@ export function ProfilePage() {
   const handleSignOut = async () => {
     await signOut();
     navigate("/login", { replace: true });
+  };
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!organization || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      await organization.inviteMember({ emailAddress: inviteEmail.trim(), role: "org:member" });
+      toast.success(`Invite sent to ${inviteEmail.trim()}`);
+      setInviteEmail("");
+    } catch {
+      toast.error("Failed to send invite. Check the email address.");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleCreateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgListLoaded || !createOrganization || !newOrgName.trim()) return;
+    setCreatingOrg(true);
+    try {
+      const org = await createOrganization({ name: newOrgName.trim() });
+      await setActive({ organization: org.id });
+      toast.success(`Organization "${org.name}" created`);
+      setNewOrgName("");
+    } catch {
+      toast.error("Failed to create organization.");
+    } finally {
+      setCreatingOrg(false);
+    }
   };
 
   const email = user.primaryEmailAddress?.emailAddress ?? "";
@@ -201,9 +240,88 @@ export function ProfilePage() {
           </CardContent>
         </Card>
 
+        {/* Organization */}
+        {organization ? (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-medium">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                Organization
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 space-y-4">
+              <div className="flex items-center justify-between rounded-lg border bg-muted/40 px-3.5 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-sm font-medium truncate">{organization.name}</span>
+                </div>
+                {isAdmin && (
+                  <span className="text-xs text-primary font-medium shrink-0 ml-2">Admin</span>
+                )}
+              </div>
+
+              {/* Invite member — admin only */}
+              {isAdmin && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Invite team member
+                  </p>
+                  <form onSubmit={handleInvite} className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="colleague@company.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      required
+                      disabled={inviting}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim()}>
+                      {inviting ? "Sending…" : (
+                        <><Plus className="h-3.5 w-3.5 mr-1" />Invite</>
+                      )}
+                    </Button>
+                  </form>
+                  <p className="text-xs text-muted-foreground">
+                    Invited members join as employees and can submit expense claims.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-medium">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                Organization
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                You're not part of an organization yet. Create one to manage expense policies for your team.
+              </p>
+              <form onSubmit={handleCreateOrg} className="flex gap-2">
+                <Input
+                  placeholder="Acme Corp"
+                  value={newOrgName}
+                  onChange={(e) => setNewOrgName(e.target.value)}
+                  required
+                  minLength={2}
+                  disabled={creatingOrg}
+                  className="flex-1"
+                />
+                <Button type="submit" size="sm" disabled={creatingOrg || !newOrgName.trim()}>
+                  {creatingOrg ? "Creating…" : "Create"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Sign out */}
-        <Card className="shadow-sm">
-          <CardContent className="px-6 py-5">
+        <Card className="shadow-sm">          <CardContent className="px-6 py-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Sign out</p>

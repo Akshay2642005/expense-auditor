@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,8 +20,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
-
-const maxFileSizeBytes = 10 << 20 // 10 MB
 
 var allowedMIMETypes = map[string]string{
 	"image/jpeg":      ".jpg",
@@ -44,6 +43,7 @@ func NewClaimService(s *server.Server, repos *repository.Repositories) *ClaimSer
 
 type SubmitClaimInput struct {
 	UserID          string
+	OrgID           string
 	BusinessPurpose string
 	ClaimedDate     time.Time
 	ExpenseCategory model.ExpenseCategory
@@ -141,6 +141,7 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 	// --- Persist claim ---
 	claim, err := s.repos.Claim.CreateClaim(ctx, &model.Claim{
 		UserID:          in.UserID,
+		OrgID:           in.OrgID,
 		ReceiptFileID:   rf.ID,
 		BusinessPurpose: in.BusinessPurpose,
 		ClaimedDate:     in.ClaimedDate,
@@ -188,6 +189,10 @@ func (s *ClaimService) GetClaim(ctx context.Context, claimID uuid.UUID, userID s
 		return nil, errs.NewForbiddenError("access denied", false)
 	}
 
+	if err := s.reconcilePolicyStatus(ctx, claim); err != nil {
+		s.server.Logger.Error().Err(err).Str("claim_id", claim.ID.String()).Msg("policy recheck failed")
+	}
+
 	return claim, nil
 }
 
@@ -197,7 +202,36 @@ func (s *ClaimService) GetUserClaims(ctx context.Context, userID string) ([]mode
 	if err != nil {
 		return nil, fmt.Errorf("failed to list claims: %w", err)
 	}
+	for i := range claims {
+		if err := s.reconcilePolicyStatus(ctx, &claims[i]); err != nil {
+			s.server.Logger.Error().Err(err).Str("claim_id", claims[i].ID.String()).Msg("policy recheck failed")
+		}
+	}
 	return claims, nil
+}
+
+// RecomputePolicyMatch re-runs policy retrieval + cap check for a claim.
+// Admin-only route should call this; no ownership check here.
+func (s *ClaimService) RecomputePolicyMatch(ctx context.Context, claimID uuid.UUID) (*model.Claim, error) {
+	_, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errs.NewNotFoundError("claim not found", false, nil)
+		}
+		return nil, fmt.Errorf("get claim: %w", err)
+	}
+
+	if s.job != nil {
+		if err := s.job.RecomputePolicyMatch(ctx, claimID); err != nil {
+			return nil, fmt.Errorf("recompute policy match: %w", err)
+		}
+	}
+
+	updated, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		return nil, fmt.Errorf("get updated claim: %w", err)
+	}
+	return updated, nil
 }
 
 // StreamReceipt downloads a receipt from GCS and streams it back.
@@ -226,4 +260,99 @@ func (s *ClaimService) StreamReceipt(ctx context.Context, claimID uuid.UUID, use
 	}
 
 	return data, contentType, nil
+}
+
+func (s *ClaimService) reconcilePolicyStatus(ctx context.Context, claim *model.Claim) error {
+	if claim.Status != model.ClaimStatusPolicyMatched && claim.Status != model.ClaimStatusNeedsReview {
+		return nil
+	}
+	if claim.Amount == nil || len(claim.PolicyChunksUsed) == 0 {
+		return nil
+	}
+	if claim.Status == model.ClaimStatusNeedsReview {
+		if claim.DateMismatch || claim.OCRError != nil {
+			return nil
+		}
+		if claim.OCRRawJSON != nil && *claim.OCRRawJSON != "" {
+			var payload struct {
+				Confidence float64 `json:"confidence"`
+			}
+			if err := json.Unmarshal([]byte(*claim.OCRRawJSON), &payload); err == nil {
+				if payload.Confidence > 0 && payload.Confidence < 0.5 {
+					return nil
+				}
+			}
+		}
+	}
+
+	chunks, err := model.UnmarshalRetrievedChunks(claim.PolicyChunksUsed)
+	if err != nil {
+		return fmt.Errorf("parse policy chunks: %w", err)
+	}
+	if len(chunks) == 0 {
+		return nil
+	}
+
+	mealsCap, lodgingCap := job.ExtractCapsFromChunks(chunks)
+	if (mealsCap == nil || lodgingCap == nil) && claim.PolicyID != nil {
+		rows, err := s.server.DB.Pool.Query(ctx, `
+			SELECT chunk_text, category, page_num
+			FROM policy_chunks
+			WHERE policy_id = $1
+		`, *claim.PolicyID)
+		if err != nil {
+			return fmt.Errorf("load full policy chunks: %w", err)
+		}
+		defer rows.Close()
+
+		var allChunks []model.RetrievedChunk
+		for rows.Next() {
+			var rc model.RetrievedChunk
+			if err := rows.Scan(&rc.ChunkText, &rc.Category, &rc.PageNum); err != nil {
+				return fmt.Errorf("scan full policy chunk: %w", err)
+			}
+			allChunks = append(allChunks, rc)
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("full policy chunk rows: %w", err)
+		}
+		allMealsCap, allLodgingCap := job.ExtractCapsFromChunks(allChunks)
+		if mealsCap == nil {
+			mealsCap = allMealsCap
+		}
+		if lodgingCap == nil {
+			lodgingCap = allLodgingCap
+		}
+	}
+	nextStatus := claim.Status
+	switch claim.ExpenseCategory {
+	case model.ExpenseCategoryMeals:
+		if mealsCap == nil {
+			nextStatus = model.ClaimStatusNeedsReview
+		} else if *claim.Amount > *mealsCap {
+			nextStatus = model.ClaimStatusFlagged
+		} else {
+			nextStatus = model.ClaimStatusPolicyMatched
+		}
+	case model.ExpenseCategoryLodging:
+		if lodgingCap == nil {
+			nextStatus = model.ClaimStatusNeedsReview
+		} else if *claim.Amount > *lodgingCap {
+			nextStatus = model.ClaimStatusFlagged
+		} else {
+			nextStatus = model.ClaimStatusPolicyMatched
+		}
+	}
+	if nextStatus == claim.Status {
+		return nil
+	}
+
+	if _, err := s.server.DB.Pool.Exec(ctx,
+		`UPDATE claims SET status = $1, updated_at = now() WHERE id = $2`,
+		nextStatus, claim.ID,
+	); err != nil {
+		return fmt.Errorf("update claim status: %w", err)
+	}
+	claim.Status = nextStatus
+	return nil
 }

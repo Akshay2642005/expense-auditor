@@ -10,15 +10,16 @@ type ClaimStatus string
 type ExpenseCategory string
 
 const (
-	ClaimStatusPending     ClaimStatus = "pending"
-	ClaimStatusProcessing  ClaimStatus = "processing"
-	ClaimStatusOCRComplete ClaimStatus = "ocr_complete"
-	ClaimStatusNeedsReview ClaimStatus = "needs_review"
-	ClaimStatusOCRFailed   ClaimStatus = "ocr_failed"
-	ClaimStatusAuditing    ClaimStatus = "auditing"
-	ClaimStatusApproved    ClaimStatus = "approved"
-	ClaimStatusFlagged     ClaimStatus = "flagged"
-	ClaimStatusRejected    ClaimStatus = "rejected"
+	ClaimStatusPending       ClaimStatus = "pending"
+	ClaimStatusProcessing    ClaimStatus = "processing"
+	ClaimStatusOCRComplete   ClaimStatus = "ocr_complete"
+	ClaimStatusNeedsReview   ClaimStatus = "needs_review"
+	ClaimStatusOCRFailed     ClaimStatus = "ocr_failed"
+	ClaimStatusPolicyMatched ClaimStatus = "policy_matched"
+	ClaimStatusAuditing      ClaimStatus = "auditing"
+	ClaimStatusApproved      ClaimStatus = "approved"
+	ClaimStatusFlagged       ClaimStatus = "flagged"
+	ClaimStatusRejected      ClaimStatus = "rejected"
 )
 const (
 	ExpenseCategoryMeals     ExpenseCategory = "meals"
@@ -40,6 +41,7 @@ type ReceiptFile struct {
 type Claim struct {
 	Base
 	UserID          string          `json:"userId"          db:"user_id"`
+	OrgID           string          `json:"orgId"           db:"org_id"`
 	ReceiptFileID   uuid.UUID       `json:"receiptFileId"   db:"receipt_file_id"`
 	BusinessPurpose string          `json:"businessPurpose" db:"business_purpose"`
 	ClaimedDate     time.Time       `json:"claimedDate"     db:"claimed_date"`
@@ -53,4 +55,7 @@ type Claim struct {
 	OCRRawJSON   *string    `json:"ocrRawJson,omitempty"   db:"ocr_raw_json"`
 	DateMismatch bool       `json:"dateMismatch"           db:"date_mismatch"`
 	OCRError     *string    `json:"ocrError,omitempty"     db:"ocr_error"`
+
+	PolicyID         *uuid.UUID `db:"policy_id"`
+	PolicyChunksUsed []byte     `db:"policy_chunks_used"`
 }

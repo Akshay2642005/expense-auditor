@@ -71,7 +71,7 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerPkg.Lo
 	jobService := job.NewJobService(logger, cfg)
 	jobService.InitHandlers(cfg, logger)
 	jobService.InitOCRHandlers(geminiClient, gcsClient, db.Pool, cfg.AI.DateMismatchThreshold)
-
+	jobService.InitPolicyHandlers(geminiClient, gcsClient, db.Pool) // Phase 2
 	if err := jobService.Start(); err != nil {
 		return nil, err
 	}

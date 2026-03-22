@@ -4,11 +4,17 @@ import (
 	"net/http"
 
 	"github.com/Akshay2642005/expense-auditor/internal/handler"
+	"github.com/Akshay2642005/expense-auditor/internal/middleware"
+	clerkMiddleware "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/labstack/echo/v4"
 )
 
 func registerClaimRoutes(g *echo.Group, h *handler.Handlers) {
 	claims := g.Group("/claims")
+	admin := g.Group("/admin/claims",
+		echo.WrapMiddleware(clerkMiddleware.RequireHeaderAuthorization()),
+		middleware.RequireOrgAdmin,
+	)
 
 	// POST /api/v1/claims — multipart upload (handled manually, not via Handle[])
 	claims.POST("", h.Claim.SubmitClaim)
@@ -35,4 +41,14 @@ func registerClaimRoutes(g *echo.Group, h *handler.Handlers) {
 
 	// GET /api/v1/claims/:id/receipt — streams the file bytes from GCS
 	claims.GET("/:id/receipt", h.Claim.GetReceipt)
+
+	// POST /api/v1/admin/claims/:id/recompute-policy
+	admin.POST("/:id/recompute-policy", func(c echo.Context) error {
+		return handler.Handle(
+			h.Claim.Handler,
+			h.Claim.RecomputePolicy,
+			http.StatusOK,
+			&handler.RecomputePolicyRequest{},
+		)(c)
+	})
 }

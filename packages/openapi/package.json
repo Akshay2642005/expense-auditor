@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Generates OpenAPI doc",
   "type": "module",
+  "files": [
+    "dist",
+    "openapi.json"
+  ],
   "scripts": {
     "gen": "tsx src/gen.ts",
     "build": "tsc && tsc-alias",
@@ -12,7 +16,7 @@
   "exports": {
     "./contracts": {
       "types": "./dist/contracts/index.d.ts",
-      "default": "./dist/contract/index.js"
+      "import": "./dist/contracts/index.js"
     }
   },
   "keywords": [],
@@ -35,4 +39,3 @@
     "wait-on": "^8.0.3"
   }
 }
-

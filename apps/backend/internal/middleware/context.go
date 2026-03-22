@@ -13,6 +13,7 @@ import (
 const (
 	UserIDKey   = "user_id"
 	UserRoleKey = "user_role"
+	OrgIDKey    = "org_id"
 	LoggerKey   = "logger"
 )
 
@@ -83,6 +84,13 @@ func (ce *ContextEnhancer) extractUserRole(c echo.Context) string {
 func GetUserID(c echo.Context) string {
 	if userID, ok := c.Get(UserIDKey).(string); ok {
 		return userID
+	}
+	return ""
+}
+
+func GetOrgID(c echo.Context) string {
+	if orgID, ok := c.Get(OrgIDKey).(string); ok {
+		return orgID
 	}
 	return ""
 }

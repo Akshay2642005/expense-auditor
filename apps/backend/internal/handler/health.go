@@ -28,14 +28,14 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 		Str("operation", "health_check").
 		Logger()
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"status":      "healthy",
 		"timestamp":   time.Now().UTC(),
 		"environment": h.server.Config.Primary.Env,
-		"checks":      make(map[string]interface{}),
+		"checks":      make(map[string]any),
 	}
 
-	checks := response["checks"].(map[string]interface{})
+	checks := response["checks"].(map[string]any)
 	isHealthy := true
 
 	// Check database connectivity
@@ -44,7 +44,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 
 	dbStart := time.Now()
 	if err := h.server.DB.Pool.Ping(ctx); err != nil {
-		checks["database"] = map[string]interface{}{
+		checks["database"] = map[string]any{
 			"status":        "unhealthy",
 			"response_time": time.Since(dbStart).String(),
 			"error":         err.Error(),
@@ -53,7 +53,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 		logger.Error().Err(err).Dur("response_time", time.Since(dbStart)).Msg("database health check failed")
 		if h.server.LoggerService != nil && h.server.LoggerService.GetApplication() != nil {
 			h.server.LoggerService.GetApplication().RecordCustomEvent(
-				"HealthCheckError", map[string]interface{}{
+				"HealthCheckError", map[string]any{
 					"check_type":       "database",
 					"operation":        "health_check",
 					"error_type":       "database_unhealthy",
@@ -62,7 +62,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 				})
 		}
 	} else {
-		checks["database"] = map[string]interface{}{
+		checks["database"] = map[string]any{
 			"status":        "healthy",
 			"response_time": time.Since(dbStart).String(),
 		}
@@ -78,7 +78,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 
 		redisStart := time.Now()
 		if err := h.server.Redis.Ping(ctx).Err(); err != nil {
-			checks["redis"] = map[string]interface{}{
+			checks["redis"] = map[string]any{
 				"status":        "unhealthy",
 				"response_time": time.Since(redisStart).String(),
 				"error":         err.Error(),
@@ -86,7 +86,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 			logger.Error().Err(err).Dur("response_time", time.Since(redisStart)).Msg("redis health check failed")
 			if h.server.LoggerService != nil && h.server.LoggerService.GetApplication() != nil {
 				h.server.LoggerService.GetApplication().RecordCustomEvent(
-					"HealthCheckError", map[string]interface{}{
+					"HealthCheckError", map[string]any{
 						"check_type":       "redis",
 						"operation":        "health_check",
 						"error_type":       "redis_unhealthy",
@@ -95,7 +95,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 					})
 			}
 		} else {
-			checks["redis"] = map[string]interface{}{
+			checks["redis"] = map[string]any{
 				"status":        "healthy",
 				"response_time": time.Since(redisStart).String(),
 			}
@@ -111,7 +111,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 			Msg("health check failed")
 		if h.server.LoggerService != nil && h.server.LoggerService.GetApplication() != nil {
 			h.server.LoggerService.GetApplication().RecordCustomEvent(
-				"HealthCheckError", map[string]interface{}{
+				"HealthCheckError", map[string]any{
 					"check_type":        "overall",
 					"operation":         "health_check",
 					"error_type":        "overall_unhealthy",
@@ -130,7 +130,7 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 		logger.Error().Err(err).Msg("failed to write JSON response")
 		if h.server.LoggerService != nil && h.server.LoggerService.GetApplication() != nil {
 			h.server.LoggerService.GetApplication().RecordCustomEvent(
-				"HealthCheckError", map[string]interface{}{
+				"HealthCheckError", map[string]any{
 					"check_type":    "response",
 					"operation":     "health_check",
 					"error_type":    "json_response_error",
@@ -142,5 +142,3 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 
 	return nil
 }
-
-

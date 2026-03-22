@@ -110,6 +110,7 @@ func (h *ClaimHandler) SubmitClaim(c echo.Context) error {
 
 	out, err := h.claimService.SubmitClaim(c.Request().Context(), &service.SubmitClaimInput{
 		UserID:          userID,
+		OrgID:           middleware.GetOrgID(c),
 		BusinessPurpose: req.BusinessPurpose,
 		ClaimedDate:     claimedDate,
 		ExpenseCategory: model.ExpenseCategory(req.ExpenseCategory),
@@ -129,7 +130,7 @@ type ListClaimsRequest struct{}
 
 func (r *ListClaimsRequest) Validate() error { return nil }
 
-func (h *ClaimHandler) ListClaims(c echo.Context, _ *ListClaimsRequest) (interface{}, error) {
+func (h *ClaimHandler) ListClaims(c echo.Context, _ *ListClaimsRequest) (any, error) {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return nil, errs.NewUnauthorizedError("unauthorized", false)
@@ -159,7 +160,7 @@ func (r *GetClaimRequest) Validate() error {
 	return nil
 }
 
-func (h *ClaimHandler) GetClaim(c echo.Context, req *GetClaimRequest) (interface{}, error) {
+func (h *ClaimHandler) GetClaim(c echo.Context, req *GetClaimRequest) (any, error) {
 	userID := middleware.GetUserID(c)
 	if userID == "" {
 		return nil, errs.NewUnauthorizedError("unauthorized", false)
@@ -203,4 +204,25 @@ func (h *ClaimHandler) GetReceipt(c echo.Context) error {
 	}
 
 	return c.Blob(http.StatusOK, contentType, data)
+}
+
+// --- POST /api/v1/admin/claims/:id/recompute-policy ---
+
+type RecomputePolicyRequest struct {
+	ID string `param:"id"`
+}
+
+func (r *RecomputePolicyRequest) Validate() error {
+	if r.ID == "" {
+		return errs.NewBadRequestError("id is required", true, nil, nil, nil)
+	}
+	if _, err := uuid.Parse(r.ID); err != nil {
+		return errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
+	}
+	return nil
+}
+
+func (h *ClaimHandler) RecomputePolicy(c echo.Context, req *RecomputePolicyRequest) (any, error) {
+	id, _ := uuid.Parse(req.ID)
+	return h.claimService.RecomputePolicyMatch(c.Request().Context(), id)
 }
