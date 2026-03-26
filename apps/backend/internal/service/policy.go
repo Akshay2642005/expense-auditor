@@ -51,7 +51,7 @@ func (s *PolicyService) UploadPolicy(
 	}
 
 	// GCS path: policies/{orgID}/{uuid}.pdf
-	gcsPath := filepath.Join("policies", orgID, uuid.New().String()+".pdf")
+	gcsPath := fmt.Sprintf("policies/%s/%s%s", orgID, uuid.New().String(), filepath.Ext(header.Filename))
 	if err := s.server.GCS.Upload(ctx, gcsPath, "application/pdf", strings.NewReader(string(pdfBytes))); err != nil {
 		return nil, fmt.Errorf("upload policy to gcs: %w", err)
 	}
