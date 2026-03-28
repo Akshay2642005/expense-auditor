@@ -40,10 +40,12 @@ type ClaimJobService interface {
 	SaveClaimOCRResult(ctx context.Context, claimID uuid.UUID, result *gemini.OCRResult, status model.ClaimStatus, dateMismatch bool) error
 	GetClaimForJob(ctx context.Context, claimID uuid.UUID) (*model.Claim, error)
 	SaveClaimPolicyMatch(ctx context.Context, claimID uuid.UUID, policyID uuid.UUID, chunks []model.RetrievedChunk, status model.ClaimStatus) error
+	SetClaimOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error
 }
 
 type PolicyJobService interface {
 	GetActivePolicyForJob(ctx context.Context, orgID string) (*model.Policy, error)
+	GetActivePolicyForUser(ctx context.Context, userID string) (*model.Policy, error)
 	SearchRelevantPolicyChunks(ctx context.Context, policyID uuid.UUID, queryVector []float32, limit int) ([]model.RetrievedChunk, error)
 	GetPolicyChunksForJob(ctx context.Context, policyID uuid.UUID) ([]model.RetrievedChunk, error)
 	SetPolicyJobStatus(ctx context.Context, policyID uuid.UUID, status model.PolicyStatus, chunkCount int) error

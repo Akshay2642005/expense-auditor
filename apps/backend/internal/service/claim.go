@@ -338,6 +338,10 @@ func (s *ClaimService) reconcilePolicyStatus(ctx context.Context, claim *model.C
 	return nil
 }
 
+func (s *ClaimService) SetClaimOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error {
+	return s.repos.Claim.SetOrgID(ctx, claimID, orgID)
+}
+
 func (s *ClaimService) SetClaimJobStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error {
 	return s.repos.Claim.SetStatus(ctx, claimID, status)
 }

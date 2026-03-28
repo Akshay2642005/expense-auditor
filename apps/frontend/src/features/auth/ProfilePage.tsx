@@ -1,5 +1,5 @@
 import { useClerk, useOrganization, useOrganizationList, useUser } from "@clerk/clerk-react";
-import { ArrowLeft, Building2, Camera, Copy, LogOut, Mail, Plus, ShieldCheck, User, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Building2, Camera, LogOut, Mail, Plus, ShieldCheck, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -24,7 +24,9 @@ export function ProfilePage() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { organization, membership } = useOrganization();
-  const { createOrganization, setActive, isLoaded: orgListLoaded } = useOrganizationList();
+  const { userMemberships, createOrganization, setActive, isLoaded: orgListLoaded } = useOrganizationList({
+    userMemberships: { infinite: false },
+  });
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -299,23 +301,58 @@ export function ProfilePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-6 pb-6 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                You're not part of an organization yet. Create one to manage expense policies for your team.
-              </p>
-              <form onSubmit={handleCreateOrg} className="flex gap-2">
-                <Input
-                  placeholder="Acme Corp"
-                  value={newOrgName}
-                  onChange={(e) => setNewOrgName(e.target.value)}
-                  required
-                  minLength={2}
-                  disabled={creatingOrg}
-                  className="flex-1"
-                />
-                <Button type="submit" size="sm" disabled={creatingOrg || !newOrgName.trim()}>
-                  {creatingOrg ? "Creating…" : "Create"}
-                </Button>
-              </form>
+              {/* Member of orgs but none active in session */}
+              {orgListLoaded && (userMemberships.data?.length ?? 0) > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3.5 py-2.5">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      You're a member of an organization but it's not active in your current session. Activate it so your expense claims are processed correctly.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {userMemberships.data?.map((m) => (
+                      <div key={m.organization.id} className="flex items-center justify-between rounded-lg border bg-muted/40 px-3.5 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          <span className="text-sm font-medium truncate">{m.organization.name}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 ml-2"
+                          onClick={async () => {
+                            await setActive({ organization: m.organization.id });
+                            toast.success(`Switched to ${m.organization.name}`);
+                          }}
+                        >
+                          Activate
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    You're not part of an organization yet. Create one to manage expense policies for your team.
+                  </p>
+                  <form onSubmit={handleCreateOrg} className="flex gap-2">
+                    <Input
+                      placeholder="Acme Corp"
+                      value={newOrgName}
+                      onChange={(e) => setNewOrgName(e.target.value)}
+                      required
+                      minLength={2}
+                      disabled={creatingOrg}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="sm" disabled={creatingOrg || !newOrgName.trim()}>
+                      {creatingOrg ? "Creating…" : "Create"}
+                    </Button>
+                  </form>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

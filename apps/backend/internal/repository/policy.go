@@ -79,6 +79,33 @@ func (r *PolicyRepository) GetActivePolicy(
 	return &p, nil
 }
 
+// GetActivePolicyByUserID finds the active policy for the org the user belongs to.
+// Used as a fallback when a claim was submitted without an active org session (empty org_id).
+func (r *PolicyRepository) GetActivePolicyByUserID(
+	ctx context.Context,
+	userID string,
+) (*model.Policy, error) {
+	const query = `
+		SELECT p.id, p.name, p.gcs_path, p.version, p.status, p.chunk_count, p.uploaded_by, p.org_id, p.created_at, p.updated_at
+		FROM policies p
+		INNER JOIN claims c ON c.org_id = p.org_id
+		WHERE p.status = 'active'
+		  AND c.user_id = $1
+		  AND c.org_id != ''
+		ORDER BY p.created_at DESC
+		LIMIT 1
+	`
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get active policy by user: %w", err)
+	}
+	p, err := pgx.CollectOneRow(rows, pgx.RowToStructByNameLax[model.Policy])
+	if err != nil {
+		return nil, fmt.Errorf("collect active policy by user: %w", err)
+	}
+	return &p, nil
+}
+
 func (r *PolicyRepository) ListPolicies(
 	ctx context.Context,
 	orgID string,

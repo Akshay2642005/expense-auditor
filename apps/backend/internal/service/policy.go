@@ -92,6 +92,10 @@ func (s *PolicyService) GetActivePolicyForJob(ctx context.Context, orgID string)
 	return s.repos.Policy.GetActivePolicy(ctx, orgID)
 }
 
+func (s *PolicyService) GetActivePolicyForUser(ctx context.Context, userID string) (*model.Policy, error) {
+	return s.repos.Policy.GetActivePolicyByUserID(ctx, userID)
+}
+
 func (s *PolicyService) SearchRelevantPolicyChunks(
 	ctx context.Context,
 	policyID uuid.UUID,

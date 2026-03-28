@@ -7,9 +7,11 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// mountPolicyRoutes registers all /api/v1/admin/policy routes.
-// Every route requires both authentication AND org:admin role.
 func registerPolicyRoutes(g *echo.Group, h *handler.Handlers) {
+	// GET /api/v1/policy/active — all authenticated org members
+	g.GET("/policy/active", h.Policy.GetActivePolicy)
+
+	// Admin-only routes
 	admin := g.Group("/admin/policy",
 		echo.WrapMiddleware(clerkMiddleware.RequireHeaderAuthorization()),
 		middleware.RequireOrgAdmin,

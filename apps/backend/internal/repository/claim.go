@@ -157,6 +157,14 @@ func (r *ClaimRepository) SetStatus(ctx context.Context, claimID uuid.UUID, stat
 	return nil
 }
 
+func (r *ClaimRepository) SetOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE claims SET org_id = $1, updated_at = now() WHERE id = $2`, orgID, claimID)
+	if err != nil {
+		return fmt.Errorf("set claim org_id: %w", err)
+	}
+	return nil
+}
+
 func (r *ClaimRepository) MarkOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE claims SET status = 'ocr_failed', ocr_error = $1, updated_at = now() WHERE id = $2`,

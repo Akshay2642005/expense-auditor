@@ -23,6 +23,31 @@ func NewPolicyHandler(s *server.Server, policyService *service.PolicyService) *P
 	}
 }
 
+// GetActivePolicy handles GET /api/v1/policy/active — available to all org members.
+func (h *PolicyHandler) GetActivePolicy(c echo.Context) error {
+	ctx := c.Request().Context()
+	orgID := middleware.GetOrgID(c)
+
+	if orgID != "" {
+		policy, err := h.policyService.GetActivePolicyForJob(ctx, orgID)
+		if err == nil {
+			return c.JSON(http.StatusOK, policy)
+		}
+	}
+
+	// org_id missing from JWT (member hasn't activated org session yet) —
+	// fall back to resolving via user_id, same as the job handler does.
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.JSON(http.StatusOK, nil)
+	}
+	policy, err := h.policyService.GetActivePolicyForUser(ctx, userID)
+	if err != nil {
+		return c.JSON(http.StatusOK, nil)
+	}
+	return c.JSON(http.StatusOK, policy)
+}
+
 // UploadPolicy handles POST /api/v1/admin/policy
 // Accepts multipart/form-data with fields: file (PDF), name, version.
 func (h *PolicyHandler) UploadPolicy(c echo.Context) error {

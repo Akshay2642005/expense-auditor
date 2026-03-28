@@ -28,15 +28,38 @@ func (j *JobService) retrieveAndSavePolicy(ctx context.Context, claimID uuid.UUI
 
 	policy, err := j.policyService.GetActivePolicyForJob(ctx, claim.OrgID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("fetch active policy: %w", err)
+		}
+		// org_id is empty (non-admin member without active org session) — fall back
+		// to finding the policy by the claim owner's user_id
+		if claim.OrgID == "" {
+			policy, err = j.policyService.GetActivePolicyForUser(ctx, claim.UserID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					log.Warn().Msg("no active policy found for user; claim stays at OCR terminal status")
+					return nil
+				}
+				return fmt.Errorf("fetch active policy by user: %w", err)
+			}
+		} else {
+			log.Warn().Str("org_id", claim.OrgID).Msg("no active policy for org; claim stays at OCR terminal status")
 			return nil
 		}
-		return fmt.Errorf("fetch active policy: %w", err)
 	}
 	if policy == nil {
 		return nil
 	}
 	policyID := policy.ID
+
+	// If the claim was stored with an empty org_id, backfill it now that we know the org
+	if claim.OrgID == "" && policy.OrgID != "" {
+		if err := j.claimService.SetClaimOrgID(ctx, claim.ID, policy.OrgID); err != nil {
+			log.Warn().Err(err).Msg("failed to backfill org_id on claim")
+		} else {
+			claim.OrgID = policy.OrgID
+		}
+	}
 
 	// Build a rich semantic query for vector search
 	queryParts := []string{

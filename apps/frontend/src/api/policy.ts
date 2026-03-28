@@ -15,6 +15,12 @@ function useApiHeaders() {
 export function usePolicyApi() {
   const getHeaders = useApiHeaders();
 
+  const getActivePolicy = useCallback(async (): Promise<Policy | null> => {
+    const headers = await getHeaders();
+    const { data } = await axios.get<Policy | null>(`${API_URL}/api/v1/policy/active`, { headers });
+    return data;
+  }, [getHeaders]);
+
   const uploadPolicy = useCallback(async (formData: FormData): Promise<Policy> => {
     const headers = await getHeaders();
     const { data } = await axios.post<Policy>(
@@ -45,7 +51,8 @@ export function usePolicyApi() {
     return data;
   }, [getHeaders]);
 
-  return useMemo(() => ({ uploadPolicy, listPolicies, getPolicy }), [
+  return useMemo(() => ({ getActivePolicy, uploadPolicy, listPolicies, getPolicy }), [
+    getActivePolicy,
     uploadPolicy,
     listPolicies,
     getPolicy,

@@ -11,8 +11,8 @@ import {
   Receipt,
   LogOut,
   User,
-  ShieldCheck,
   Users,
+  FileText,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -141,19 +141,6 @@ export function ClaimsListPage() {
 
             <ThemeToggle />
 
-            {/* Admin-only Policy Button */}
-            {orgRole === "org:admin" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 text-xs"
-                onClick={() => navigate("/admin/policy")}
-              >
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Policy Admin
-              </Button>
-            )}
-
             {/* Admin-only Invite Button */}
             {orgRole === "org:admin" && (
               <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
@@ -225,6 +212,11 @@ export function ClaimsListPage() {
                 <DropdownMenuItem onClick={() => navigate("/profile")}>
                   <User className="mr-2 h-4 w-4" />
                   Profile
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => navigate(orgRole === "org:admin" ? "/admin/policy" : "/policy")}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  {orgRole === "org:admin" ? "Policy Admin" : "Expense Policy"}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
