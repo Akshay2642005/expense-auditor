@@ -52,6 +52,10 @@ func main() {
 	}
 	handlers := handler.NewHandlers(srv, services)
 
+	if err := srv.Job.Start(); err != nil {
+		log.Fatal().Err(err).Msg("failed to start job service")
+	}
+
 	// Initialize router
 	r := router.NewRouter(srv, handlers, services)
 
@@ -79,5 +83,3 @@ func main() {
 
 	log.Info().Msg("server exited properly")
 }
-
-

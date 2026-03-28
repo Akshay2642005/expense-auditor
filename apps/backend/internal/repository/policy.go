@@ -153,3 +153,99 @@ func (r *PolicyRepository) BulkInsertChunks(ctx context.Context, chunks []model.
 	}
 	return nil
 }
+
+func (r *PolicyRepository) SearchRelevantChunks(
+	ctx context.Context,
+	policyID uuid.UUID,
+	queryVector []float32,
+	limit int,
+) ([]model.RetrievedChunk, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT chunk_text, category, page_num,
+		       1 - (embedding <=> $1::vector) AS score
+		FROM policy_chunks
+		WHERE policy_id = $2
+		ORDER BY embedding <=> $1::vector
+		LIMIT $3`,
+		pgvector.NewVector(queryVector), policyID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search relevant chunks: %w", err)
+	}
+
+	retrieved, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.RetrievedChunk, error) {
+		var chunk model.RetrievedChunk
+		err := row.Scan(&chunk.ChunkText, &chunk.Category, &chunk.PageNum, &chunk.Score)
+		return chunk, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect relevant chunks: %w", err)
+	}
+
+	return retrieved, nil
+}
+
+func (r *PolicyRepository) GetPolicyChunks(ctx context.Context, policyID uuid.UUID) ([]model.RetrievedChunk, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT chunk_text, category, page_num
+		FROM policy_chunks
+		WHERE policy_id = $1
+	`, policyID)
+	if err != nil {
+		return nil, fmt.Errorf("get policy chunks: %w", err)
+	}
+
+	chunks, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.RetrievedChunk, error) {
+		var chunk model.RetrievedChunk
+		err := row.Scan(&chunk.ChunkText, &chunk.Category, &chunk.PageNum)
+		return chunk, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("collect policy chunks: %w", err)
+	}
+
+	return chunks, nil
+}
+
+func (r *PolicyRepository) ActivatePolicyWithChunks(ctx context.Context, policyID uuid.UUID, chunks []model.PolicyChunkInsert) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin policy activation tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE policies SET status = 'archived' WHERE status = 'active' AND id != $1 AND org_id = (SELECT org_id FROM policies WHERE id = $1)`,
+		policyID,
+	); err != nil {
+		return fmt.Errorf("archive active policies: %w", err)
+	}
+
+	for _, chunk := range chunks {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO policy_chunks (policy_id, chunk_text, embedding, category, page_num, chunk_index)
+			 VALUES ($1, $2, $3, $4, $5, $6)`,
+			chunk.PolicyID,
+			chunk.ChunkText,
+			pgvector.NewVector(chunk.Embedding),
+			chunk.Category,
+			chunk.PageNum,
+			chunk.ChunkIndex,
+		); err != nil {
+			return fmt.Errorf("insert policy chunk: %w", err)
+		}
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE policies SET status = 'active', chunk_count = $1 WHERE id = $2`,
+		len(chunks), policyID,
+	); err != nil {
+		return fmt.Errorf("activate policy: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit policy activation: %w", err)
+	}
+
+	return nil
+}

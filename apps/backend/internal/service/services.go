@@ -11,16 +11,20 @@ type Services struct {
 	Claim  *ClaimService
 	Policy *PolicyService
 	Job    *job.JobService
+	Audit  *AuditService
 }
 
 func NewServices(s *server.Server, repos *repository.Repositories) (*Services, error) {
 	authService := NewAuthService(s)
 	claimService := NewClaimService(s, repos)
 	policyService := NewPolicyService(s, repos)
+	auditService := NewAuditService(s, repos)
+	s.Job.SetServices(claimService, policyService, auditService)
 	return &Services{
 		Job:    s.Job,
 		Auth:   authService,
 		Claim:  claimService,
 		Policy: policyService,
+		Audit:  auditService,
 	}, nil
 }

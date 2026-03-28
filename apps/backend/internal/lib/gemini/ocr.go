@@ -90,7 +90,7 @@ func (c *Client) ExtractReceiptData(ctx context.Context, imageData []byte, mimeT
 
 	resp, err := c.gc.Models.GenerateContent(
 		ctx,
-		"gemini-2.5-flash",
+		"gemini-3.1-pro-preview",
 		contents,
 		&genai.GenerateContentConfig{
 			ResponseMIMEType: "application/json",

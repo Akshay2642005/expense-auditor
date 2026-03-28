@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Akshay2642005/expense-auditor/internal/errs"
+	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/job"
 	"github.com/Akshay2642005/expense-auditor/internal/model"
 	"github.com/Akshay2642005/expense-auditor/internal/repository"
@@ -295,26 +296,9 @@ func (s *ClaimService) reconcilePolicyStatus(ctx context.Context, claim *model.C
 
 	mealsCap, lodgingCap := job.ExtractCapsFromChunks(chunks)
 	if (mealsCap == nil || lodgingCap == nil) && claim.PolicyID != nil {
-		rows, err := s.server.DB.Pool.Query(ctx, `
-			SELECT chunk_text, category, page_num
-			FROM policy_chunks
-			WHERE policy_id = $1
-		`, *claim.PolicyID)
+		allChunks, err := s.repos.Policy.GetPolicyChunks(ctx, *claim.PolicyID)
 		if err != nil {
 			return fmt.Errorf("load full policy chunks: %w", err)
-		}
-		defer rows.Close()
-
-		var allChunks []model.RetrievedChunk
-		for rows.Next() {
-			var rc model.RetrievedChunk
-			if err := rows.Scan(&rc.ChunkText, &rc.Category, &rc.PageNum); err != nil {
-				return fmt.Errorf("scan full policy chunk: %w", err)
-			}
-			allChunks = append(allChunks, rc)
-		}
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("full policy chunk rows: %w", err)
 		}
 		allMealsCap, allLodgingCap := job.ExtractCapsFromChunks(allChunks)
 		if mealsCap == nil {
@@ -347,12 +331,83 @@ func (s *ClaimService) reconcilePolicyStatus(ctx context.Context, claim *model.C
 		return nil
 	}
 
-	if _, err := s.server.DB.Pool.Exec(ctx,
-		`UPDATE claims SET status = $1, updated_at = now() WHERE id = $2`,
-		nextStatus, claim.ID,
-	); err != nil {
+	if err := s.repos.Claim.SetStatus(ctx, claim.ID, nextStatus); err != nil {
 		return fmt.Errorf("update claim status: %w", err)
 	}
 	claim.Status = nextStatus
 	return nil
+}
+
+func (s *ClaimService) SetClaimJobStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error {
+	return s.repos.Claim.SetStatus(ctx, claimID, status)
+}
+
+func (s *ClaimService) MarkClaimOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error {
+	return s.repos.Claim.MarkOCRFailed(ctx, claimID, reason)
+}
+
+func (s *ClaimService) SaveClaimOCRResult(
+	ctx context.Context,
+	claimID uuid.UUID,
+	result *gemini.OCRResult,
+	status model.ClaimStatus,
+	dateMismatch bool,
+) error {
+	var merchantName *string
+	if result.MerchantName != "" {
+		merchantName = &result.MerchantName
+	}
+
+	var receiptDate *time.Time
+	if result.Date != "" {
+		d, err := time.Parse("2006-01-02", result.Date)
+		if err == nil {
+			receiptDate = &d
+		}
+	}
+
+	var amount *float64
+	if result.TotalAmount > 0 {
+		amount = &result.TotalAmount
+	}
+
+	var currency *string
+	if result.Currency != "" {
+		currency = &result.Currency
+	}
+
+	var rawJSON *string
+	if result.RawJSON != "" {
+		rawJSON = &result.RawJSON
+	}
+
+	return s.repos.Claim.SaveOCRResult(
+		ctx,
+		claimID,
+		status,
+		merchantName,
+		receiptDate,
+		amount,
+		currency,
+		rawJSON,
+		dateMismatch,
+	)
+}
+
+func (s *ClaimService) GetClaimForJob(ctx context.Context, claimID uuid.UUID) (*model.Claim, error) {
+	return s.repos.Claim.GetClaimByID(ctx, claimID)
+}
+
+func (s *ClaimService) SaveClaimPolicyMatch(
+	ctx context.Context,
+	claimID uuid.UUID,
+	policyID uuid.UUID,
+	chunks []model.RetrievedChunk,
+	status model.ClaimStatus,
+) error {
+	raw, err := model.MarshalRetrievedChunks(chunks)
+	if err != nil {
+		return err
+	}
+	return s.repos.Claim.SavePolicyMatch(ctx, claimID, policyID, raw, status)
 }

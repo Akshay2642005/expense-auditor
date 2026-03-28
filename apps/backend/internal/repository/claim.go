@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Akshay2642005/expense-auditor/internal/model"
 	"github.com/google/uuid"
@@ -146,4 +147,84 @@ func (r *ClaimRepository) GetReceiptFileByClaimID(ctx context.Context, claimID u
 	}
 
 	return &rf, nil
+}
+
+func (r *ClaimRepository) SetStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error {
+	_, err := r.db.Exec(ctx, `UPDATE claims SET status = $1, updated_at = now() WHERE id = $2`, status, claimID)
+	if err != nil {
+		return fmt.Errorf("set claim status: %w", err)
+	}
+	return nil
+}
+
+func (r *ClaimRepository) MarkOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE claims SET status = 'ocr_failed', ocr_error = $1, updated_at = now() WHERE id = $2`,
+		reason, claimID,
+	)
+	if err != nil {
+		return fmt.Errorf("mark ocr failed: %w", err)
+	}
+	return nil
+}
+
+func (r *ClaimRepository) SaveOCRResult(
+	ctx context.Context,
+	claimID uuid.UUID,
+	status model.ClaimStatus,
+	merchantName *string,
+	receiptDate *time.Time,
+	amount *float64,
+	currency *string,
+	rawJSON *string,
+	dateMismatch bool,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE claims SET
+			status        = $1,
+			merchant_name = $2,
+			receipt_date  = $3,
+			amount        = $4,
+			currency      = $5,
+			ocr_raw_json  = $6::jsonb,
+			date_mismatch = $7,
+			updated_at    = now()
+		WHERE id = $8
+	`, string(status), merchantName, receiptDate, amount, currency, rawJSON, dateMismatch, claimID)
+	if err != nil {
+		return fmt.Errorf("save ocr result: %w", err)
+	}
+	return nil
+}
+
+func (r *ClaimRepository) SavePolicyMatch(
+	ctx context.Context,
+	claimID uuid.UUID,
+	policyID uuid.UUID,
+	policyChunksUsed []byte,
+	status model.ClaimStatus,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE claims
+		SET status             = $4,
+		    policy_id          = $1,
+		    policy_chunks_used = $2,
+		    updated_at         = now()
+		WHERE id = $3
+	`, policyID, policyChunksUsed, claimID, status)
+	if err != nil {
+		return fmt.Errorf("save policy match: %w", err)
+	}
+	return nil
+}
+
+func (r *ClaimRepository) GetClaimOwnerUserID(ctx context.Context, claimID uuid.UUID) (string, error) {
+	var ownerUserID string
+	err := r.db.QueryRow(ctx,
+		`SELECT user_id FROM claims WHERE id = $1`, claimID,
+	).Scan(&ownerUserID)
+	if err != nil {
+		return "", fmt.Errorf("get claim owner: %w", err)
+	}
+	return ownerUserID, nil
 }

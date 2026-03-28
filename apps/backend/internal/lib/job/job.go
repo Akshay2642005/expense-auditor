@@ -1,6 +1,8 @@
 package job
 
 import (
+	"errors"
+
 	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
@@ -11,6 +13,10 @@ type JobService struct {
 	Client *asynq.Client
 	server *asynq.Server
 	logger *zerolog.Logger
+
+	claimService  ClaimJobService
+	policyService PolicyJobService
+	auditService  AuditJobService
 }
 
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
@@ -38,9 +44,12 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 }
 
 func (j *JobService) Start() error {
+	if j.claimService == nil || j.policyService == nil || j.auditService == nil {
+		return errors.New("job services not configured")
+	}
+
 	mux := asynq.NewServeMux()
-	mux.HandleFunc(TaskOCRReceipt, j.handleOCRReceiptTask)
-	mux.HandleFunc(TaskPolicyIngestion, j.handlePolicyIngestionTask)
+	j.registerHandlers(mux)
 
 	j.logger.Info().Msg("starting background job server")
 	return j.server.Start(mux)

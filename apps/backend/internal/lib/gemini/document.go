@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	pdfExtractionModel = "gemini-2.5-flash"
+	pdfExtractionModel = "gemini-embedding-2-preview"
 
 	// fileStatePollInterval is how long to wait between Files API state polls.
 	fileStatePollInterval = 2 * time.Second

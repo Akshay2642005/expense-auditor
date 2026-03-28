@@ -87,3 +87,37 @@ func (s *PolicyService) GetPolicy(ctx context.Context, id uuid.UUID) (*model.Pol
 func (s *PolicyService) ListPolicies(ctx context.Context, orgID string) ([]model.Policy, error) {
 	return s.repos.Policy.ListPolicies(ctx, orgID)
 }
+
+func (s *PolicyService) GetActivePolicyForJob(ctx context.Context, orgID string) (*model.Policy, error) {
+	return s.repos.Policy.GetActivePolicy(ctx, orgID)
+}
+
+func (s *PolicyService) SearchRelevantPolicyChunks(
+	ctx context.Context,
+	policyID uuid.UUID,
+	queryVector []float32,
+	limit int,
+) ([]model.RetrievedChunk, error) {
+	return s.repos.Policy.SearchRelevantChunks(ctx, policyID, queryVector, limit)
+}
+
+func (s *PolicyService) GetPolicyChunksForJob(ctx context.Context, policyID uuid.UUID) ([]model.RetrievedChunk, error) {
+	return s.repos.Policy.GetPolicyChunks(ctx, policyID)
+}
+
+func (s *PolicyService) SetPolicyJobStatus(
+	ctx context.Context,
+	policyID uuid.UUID,
+	status model.PolicyStatus,
+	chunkCount int,
+) error {
+	return s.repos.Policy.SetPolicyStatus(ctx, policyID, status, chunkCount)
+}
+
+func (s *PolicyService) ActivatePolicyChunks(
+	ctx context.Context,
+	policyID uuid.UUID,
+	chunks []model.PolicyChunkInsert,
+) error {
+	return s.repos.Policy.ActivatePolicyWithChunks(ctx, policyID, chunks)
+}

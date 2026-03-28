@@ -29,7 +29,13 @@ func registerClaimRoutes(g *echo.Group, h *handler.Handlers) {
 		)(c)
 	})
 
-	// GET /api/v1/claims/:id
+	// GET /api/v1/claims/:id/receipt — streams the file bytes from GCS
+	claims.GET("/:id/receipt", h.Claim.GetReceipt)
+
+	// GET /api/v1/claims/:id/audit — returns the latest AI audit result for the claim
+	claims.GET("/:id/audit", h.AuditHandler.GetClaimAuditDirect)
+
+	// GET /api/v1/claims/:id — must be registered AFTER sub-paths to avoid shadowing
 	claims.GET("/:id", func(c echo.Context) error {
 		return handler.Handle(
 			h.Claim.Handler,
@@ -38,9 +44,6 @@ func registerClaimRoutes(g *echo.Group, h *handler.Handlers) {
 			&handler.GetClaimRequest{},
 		)(c)
 	})
-
-	// GET /api/v1/claims/:id/receipt — streams the file bytes from GCS
-	claims.GET("/:id/receipt", h.Claim.GetReceipt)
 
 	// POST /api/v1/admin/claims/:id/recompute-policy
 	admin.POST("/:id/recompute-policy", func(c echo.Context) error {

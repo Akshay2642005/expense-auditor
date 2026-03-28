@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
   AlertCircle, CheckCircle2, Clock, Eye,
-  RefreshCw, AlertTriangle, XCircle, FileText,
+  RefreshCw, AlertTriangle, XCircle, FileText, Quote,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -13,8 +13,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { API_URL } from "@/config/env";
-import type { ClaimResponse } from "@auditor/zod";
+import type { ClaimResponse, AuditResponse } from "@auditor/zod";
+import { useAuditApi } from "@/api/audit";
 import { cn } from "@/lib/utils";
+
+/**
+ * ExtendedAudit augments the canonical AuditResponse with a few optional
+ * diagnostic fields that the backend may include (messages/explanation/details).
+ * We use runtime-safe checks when rendering these fields so the UI stays
+ * robust even if the shared zod schema doesn't include them yet.
+ */
+type ExtendedAudit = AuditResponse & Partial<{
+  messages: unknown[];
+  explanation?: string;
+  details?: unknown;
+  deterministicRule?: string;
+}>;
 
 const POLL_INTERVAL_MS = 3_000;
 const TERMINAL_STATUSES = new Set([
@@ -75,18 +89,31 @@ export function ClaimStatusPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [claim?.status]);
 
-  // Authenticated receipt viewer — fetches with Bearer token, opens blob URL
+  // Audit API hook + audit query
+  const { getAudit, downloadReceipt } = useAuditApi();
+
+  const { data: audit } = useQuery({
+    queryKey: ["audit", id],
+    queryFn: async ({ signal }) => {
+      if (!id) return null;
+      // pass through the AbortSignal so requests can be cancelled by react-query
+      return getAudit(id!, signal);
+    },
+    enabled: !!claim && ["approved", "flagged", "rejected"].includes(claim.status),
+    refetchInterval: (query) =>
+      query.state.data ? false : POLL_INTERVAL_MS,
+  });
+
+  // Cast to ExtendedAudit so we can safely render optional diagnostic fields
+  const extAudit = audit as ExtendedAudit | null;
+
+  // Authenticated receipt viewer — uses downloadReceipt helper to fetch blob and open it
   const handleViewReceipt = async () => {
     if (!claim) return;
     setReceiptLoading(true);
     try {
-      const token = await getToken();
-      const resp = await axios.get(`${API_URL}/api/v1/claims/${claim.id}/receipt`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        responseType: "blob",
-      });
-
-      const blobUrl = URL.createObjectURL(resp.data as Blob);
+      const blob = await downloadReceipt(claim.id);
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
       a.target = "_blank";
@@ -196,6 +223,70 @@ export function ClaimStatusPage() {
               Re-run Policy Match
             </Button>
           </div>
+        )}
+
+        {/* AI Audit result */}
+        {extAudit && (
+          <Card className="border">
+            <CardHeader>
+              <CardTitle className="text-base">AI Audit: {extAudit.decision}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg p-3 text-sm bg-muted">
+                <p className="font-medium mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+                  Reason
+                </p>
+                <p className="text-foreground leading-relaxed">{extAudit.reason}</p>
+              </div>
+
+              {extAudit.citedPolicyText && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Cited Policy
+                  </p>
+                  <blockquote className="border-l-2 border-muted-foreground/30 pl-3">
+                    <div className="flex gap-2 text-sm text-muted-foreground italic leading-relaxed">
+                      <Quote className="h-3.5 w-3.5 shrink-0 mt-0.5 opacity-50" />
+                      <span>{extAudit.citedPolicyText}</span>
+                    </div>
+                  </blockquote>
+                </div>
+              )}
+
+              {/* Detailed reasoning/messages returned by the audit service */}
+              {(extAudit && (Array.isArray(extAudit.messages) || typeof extAudit.explanation === "string" || extAudit.details !== undefined)) && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Detailed Reasoning
+                  </p>
+
+                  {Array.isArray(extAudit.messages) && extAudit.messages.length > 0 ? (
+                    <div className="space-y-2 text-sm">
+                      {extAudit.messages.map((m, i) => (
+                        <pre key={i} className="whitespace-pre-wrap rounded bg-muted p-2 text-xs">{typeof m === "string" ? m : JSON.stringify(m, null, 2)}</pre>
+                      ))}
+                    </div>
+                  ) : typeof extAudit.explanation === "string" ? (
+                    <pre className="whitespace-pre-wrap rounded bg-muted p-2 text-sm">{extAudit.explanation}</pre>
+                  ) : extAudit.details !== undefined ? (
+                    <pre className="whitespace-pre-wrap rounded bg-muted p-2 text-sm">{typeof extAudit.details === "string" ? extAudit.details : JSON.stringify(extAudit.details, null, 2)}</pre>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                <span>Confidence: {Math.round((extAudit.confidence ?? 0) * 100)}%</span>
+                <span>{extAudit.aiModel ?? ""}</span>
+              </div>
+
+              {orgRole === "org:admin" && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-1">Raw Audit JSON (admin only)</p>
+                  <pre className="whitespace-pre-wrap rounded bg-muted p-2 text-xs overflow-auto max-h-64">{JSON.stringify(extAudit, null, 2)}</pre>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Extracted receipt data */}
