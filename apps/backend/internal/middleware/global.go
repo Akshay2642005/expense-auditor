@@ -3,13 +3,13 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/Akshay2642005/expense-auditor/internal/errs"
+	"github.com/Akshay2642005/expense-auditor/internal/server"
+	"github.com/Akshay2642005/expense-auditor/internal/sqlerr"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/Akshay2642005/expense-auditor/internal/errs"
-	"github.com/Akshay2642005/expense-auditor/internal/server"
-	"github.com/Akshay2642005/expense-auditor/internal/sqlerr"
 )
 
 type GlobalMiddlewares struct {
@@ -172,5 +172,3 @@ func (global *GlobalMiddlewares) GlobalErrorHandler(err error, c echo.Context) {
 		})
 	}
 }
-
-

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"html/template"
 
+	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/pkg/errors"
 	"github.com/resend/resend-go/v2"
 	"github.com/rs/zerolog"
-	"github.com/Akshay2642005/expense-auditor/internal/config"
 )
 
 type Client struct {
@@ -50,6 +50,3 @@ func (c *Client) SendEmail(to, subject string, templateName Template, data map[s
 
 	return nil
 }
-
-
-

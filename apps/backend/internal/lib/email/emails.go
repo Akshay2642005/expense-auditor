@@ -12,4 +12,3 @@ func (c *Client) SendWelcomeEmail(to, firstName string) error {
 		data,
 	)
 }
-

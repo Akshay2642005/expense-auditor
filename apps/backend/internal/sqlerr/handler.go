@@ -209,5 +209,3 @@ func HandleError(err error) error {
 
 	return errs.NewInternalServerError()
 }
-
-

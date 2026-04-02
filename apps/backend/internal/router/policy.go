@@ -10,6 +10,8 @@ import (
 func registerPolicyRoutes(g *echo.Group, h *handler.Handlers) {
 	// GET /api/v1/policy/active — all authenticated org members
 	g.GET("/policy/active", h.Policy.GetActivePolicy)
+	// GET /api/v1/policy/active/download — stream the active policy PDF
+	g.GET("/policy/active/download", h.Policy.DownloadActivePolicy)
 
 	// Admin-only routes
 	admin := g.Group("/admin/policy",

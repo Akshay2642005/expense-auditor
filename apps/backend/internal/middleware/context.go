@@ -3,11 +3,11 @@ package middleware
 import (
 	"context"
 
+	"github.com/Akshay2642005/expense-auditor/internal/logger"
+	"github.com/Akshay2642005/expense-auditor/internal/server"
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog"
-	"github.com/Akshay2642005/expense-auditor/internal/logger"
-	"github.com/Akshay2642005/expense-auditor/internal/server"
 )
 
 const (
@@ -103,5 +103,3 @@ func GetLogger(c echo.Context) *zerolog.Logger {
 	logger := zerolog.Nop()
 	return &logger
 }
-
-

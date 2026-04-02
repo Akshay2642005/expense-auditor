@@ -23,30 +23,21 @@ function Spinner() {
   );
 }
 
-/**
- * Automatically activates the user's first org membership if no org is currently
- * active in the session. This ensures non-admin members who accepted an invite
- * always have ActiveOrganizationID set in their JWT, so the backend can resolve
- * the correct policy for their claims.
- */
 function OrgActivator() {
-  const { orgId } = useAuth();
+  const { orgId, isLoaded: authLoaded } = useAuth();
   const { userMemberships, isLoaded, setActive } = useOrganizationList({
     userMemberships: { infinite: false },
   });
 
   useEffect(() => {
-    if (!isLoaded || orgId) return;
+    if (!authLoaded || !isLoaded || orgId) return;
     const first = userMemberships.data?.[0];
-    if (first) {
-      setActive({ organization: first.organization.id });
-    }
-  }, [isLoaded, orgId, userMemberships.data, setActive]);
+    if (first) setActive({ organization: first.organization.id });
+  }, [authLoaded, isLoaded, orgId, userMemberships.data, setActive]);
 
   return null;
 }
 
-// Redirects to /login if not signed in
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useUser();
   if (!isLoaded) return <Spinner />;
@@ -54,7 +45,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Redirects to / if already signed in
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useUser();
   if (!isLoaded) return <Spinner />;
@@ -67,22 +57,17 @@ export default function App() {
     <>
       <OrgActivator />
       <Routes>
-        {/* Public auth routes */}
         <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/sso-callback" element={<SSOCallbackPage />} />
         <Route path="/create-org" element={<ProtectedRoute><CreateOrgPage /></ProtectedRoute>} />
-
-        {/* Protected routes */}
         <Route path="/" element={<ProtectedRoute><ClaimsListPage /></ProtectedRoute>} />
         <Route path="/claims/new" element={<ProtectedRoute><SubmitClaimPage /></ProtectedRoute>} />
         <Route path="/claims/:id" element={<ProtectedRoute><ClaimStatusPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-
         <Route path="/admin/policy" element={<PolicyAdminPage />} />
         <Route path="/policy" element={<ProtectedRoute><PolicyPage /></ProtectedRoute>} />
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

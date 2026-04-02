@@ -65,7 +65,7 @@ func (c *Client) AuditClaim(ctx context.Context, claimDetails, policyChunks stri
 
 	resp, err := c.gc.Models.GenerateContent(
 		ctx,
-		"gemini-3.1-pro-preview",
+		"gemini-2.5-flash",
 		contents,
 		&genai.GenerateContentConfig{
 			SystemInstruction: &genai.Content{

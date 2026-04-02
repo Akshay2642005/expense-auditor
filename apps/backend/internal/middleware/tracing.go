@@ -72,5 +72,3 @@ func (tm *TracingMiddleware) EnhanceTracing() echo.MiddlewareFunc {
 		}
 	}
 }
-
-

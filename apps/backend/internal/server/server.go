@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Akshay2642005/expense-auditor/internal/cache"
 	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/Akshay2642005/expense-auditor/internal/database"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
@@ -24,6 +25,7 @@ type Server struct {
 	LoggerService *loggerPkg.LoggerService
 	DB            *database.Database
 	Redis         *redis.Client
+	Cache         *cache.Client
 	GCS           *gcslib.GCSClient
 	Gemini        *gemini.Client
 	httpServer    *http.Server
@@ -88,6 +90,7 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerPkg.Lo
 		LoggerService: loggerService,
 		DB:            db,
 		Redis:         redisClient,
+		Cache:         cache.New(redisClient),
 		GCS:           gcsClient,
 		Gemini:        geminiClient,
 		Job:           jobService,

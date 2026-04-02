@@ -7,8 +7,13 @@ import type { Policy } from "@auditor/zod";
 function useApiHeaders() {
   const { getToken } = useAuth();
   return useCallback(async () => {
-    const token = await getToken();
-    return { Authorization: `Bearer ${token}` };
+    // Retry until Clerk's JWT is hydrated (guards against post-refresh race)
+    for (let i = 0; i < 5; i++) {
+      const token = await getToken();
+      if (token) return { Authorization: `Bearer ${token}` };
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    throw new Error("Auth token unavailable");
   }, [getToken]);
 }
 
@@ -19,6 +24,15 @@ export function usePolicyApi() {
     const headers = await getHeaders();
     const { data } = await axios.get<Policy | null>(`${API_URL}/api/v1/policy/active`, { headers });
     return data;
+  }, [getHeaders]);
+
+  const getActivePolicyDownloadUrl = useCallback(async (): Promise<string> => {
+    const headers = await getHeaders();
+    const { data } = await axios.get<Blob>(
+      `${API_URL}/api/v1/policy/active/download`,
+      { headers, responseType: "blob" }
+    );
+    return URL.createObjectURL(data);
   }, [getHeaders]);
 
   const uploadPolicy = useCallback(async (formData: FormData): Promise<Policy> => {
@@ -51,8 +65,9 @@ export function usePolicyApi() {
     return data;
   }, [getHeaders]);
 
-  return useMemo(() => ({ getActivePolicy, uploadPolicy, listPolicies, getPolicy }), [
+  return useMemo(() => ({ getActivePolicy, getActivePolicyDownloadUrl, uploadPolicy, listPolicies, getPolicy }), [
     getActivePolicy,
+    getActivePolicyDownloadUrl,
     uploadPolicy,
     listPolicies,
     getPolicy,

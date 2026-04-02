@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Akshay2642005/expense-auditor/internal/cache"
 	"github.com/Akshay2642005/expense-auditor/internal/errs"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/job"
@@ -152,6 +153,9 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}
 
+	// Invalidate the user's claim list so the new claim appears immediately
+	_ = cache.Del(ctx, s.server.Cache, cache.KeyClaimList(in.UserID))
+
 	// --- Enqueue OCR job ---
 	ocrTask, err := job.NewOCRReceiptTask(claim.ID, gcsPath, mimeType, in.ClaimedDate)
 	if err != nil {
@@ -176,8 +180,17 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 	}, nil
 }
 
-// GetClaim returns a claim by ID, enforcing ownership.
+// GetClaim returns a claim by ID, enforcing ownership. Reads from cache first.
 func (s *ClaimService) GetClaim(ctx context.Context, claimID uuid.UUID, userID string) (*model.Claim, error) {
+	key := cache.KeyClaim(claimID.String())
+	if cached, ok, _ := cache.Get[model.Claim](ctx, s.server.Cache, key); ok {
+		s.server.Logger.Debug().Str("key", key).Msg("cache hit: claim")
+		if cached.UserID != userID {
+			return nil, errs.NewForbiddenError("access denied", false)
+		}
+		return cached, nil
+	}
+
 	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -185,29 +198,66 @@ func (s *ClaimService) GetClaim(ctx context.Context, claimID uuid.UUID, userID s
 		}
 		return nil, fmt.Errorf("failed to get claim: %w", err)
 	}
-
 	if claim.UserID != userID {
 		return nil, errs.NewForbiddenError("access denied", false)
 	}
 
-	if err := s.reconcilePolicyStatus(ctx, claim); err != nil {
-		s.server.Logger.Error().Err(err).Str("claim_id", claim.ID.String()).Msg("policy recheck failed")
-	}
+	// Cache immediately before reconciliation so concurrent requests hit cache
+	_ = cache.Set(ctx, s.server.Cache, key, *claim, cache.TTLClaim)
+
+	// Reconcile policy status in background — re-caches if status changed
+	go func() {
+		bgCtx := context.Background()
+		prev := claim.Status
+		if err := s.reconcilePolicyStatus(bgCtx, claim); err != nil {
+			s.server.Logger.Error().Err(err).Str("claim_id", claim.ID.String()).Msg("policy recheck failed")
+			return
+		}
+		if claim.Status != prev {
+			_ = cache.Set(bgCtx, s.server.Cache, key, *claim, cache.TTLClaim)
+		}
+	}()
 
 	return claim, nil
 }
 
-// GetUserClaims returns all claims for the authenticated user.
+// GetUserClaims returns all claims for the authenticated user. Reads from cache first.
 func (s *ClaimService) GetUserClaims(ctx context.Context, userID string) ([]model.Claim, error) {
+	key := cache.KeyClaimList(userID)
+	if cached, ok, _ := cache.Get[[]model.Claim](ctx, s.server.Cache, key); ok {
+		s.server.Logger.Debug().Str("key", key).Msg("cache hit: claim list")
+		return *cached, nil
+	}
+
 	claims, err := s.repos.Claim.GetClaimsByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list claims: %w", err)
 	}
-	for i := range claims {
-		if err := s.reconcilePolicyStatus(ctx, &claims[i]); err != nil {
-			s.server.Logger.Error().Err(err).Str("claim_id", claims[i].ID.String()).Msg("policy recheck failed")
+
+	// Cache the raw DB result immediately so concurrent requests don't all hit DB
+	_ = cache.Set(ctx, s.server.Cache, key, claims, cache.TTLClaimList)
+
+	// Reconcile policy status in the background — only for claims that need it.
+	// This mutates status in DB + invalidates cache if anything changed.
+	go func() {
+		bgCtx := context.Background()
+		changed := false
+		for i := range claims {
+			prev := claims[i].Status
+			if err := s.reconcilePolicyStatus(bgCtx, &claims[i]); err != nil {
+				s.server.Logger.Error().Err(err).Str("claim_id", claims[i].ID.String()).Msg("policy recheck failed")
+				continue
+			}
+			if claims[i].Status != prev {
+				changed = true
+			}
 		}
-	}
+		if changed {
+			// Re-cache with updated statuses
+			_ = cache.Set(bgCtx, s.server.Cache, key, claims, cache.TTLClaimList)
+		}
+	}()
+
 	return claims, nil
 }
 
@@ -238,7 +288,7 @@ func (s *ClaimService) RecomputePolicyMatch(ctx context.Context, claimID uuid.UU
 // StreamReceipt downloads a receipt from GCS and streams it back.
 // Enforces ownership before serving the file.
 func (s *ClaimService) StreamReceipt(ctx context.Context, claimID uuid.UUID, userID string) ([]byte, string, error) {
-	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID) // intentionally bypass cache — binary blob
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", errs.NewNotFoundError("claim not found", false, nil)
@@ -343,11 +393,28 @@ func (s *ClaimService) SetClaimOrgID(ctx context.Context, claimID uuid.UUID, org
 }
 
 func (s *ClaimService) SetClaimJobStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error {
-	return s.repos.Claim.SetStatus(ctx, claimID, status)
+	if err := s.repos.Claim.SetStatus(ctx, claimID, status); err != nil {
+		return err
+	}
+	s.invalidateClaimCaches(ctx, claimID)
+	return nil
 }
 
 func (s *ClaimService) MarkClaimOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error {
-	return s.repos.Claim.MarkOCRFailed(ctx, claimID, reason)
+	if err := s.repos.Claim.MarkOCRFailed(ctx, claimID, reason); err != nil {
+		return err
+	}
+	s.invalidateClaimCaches(ctx, claimID)
+	return nil
+}
+
+// invalidateClaimCaches removes the individual claim and the owner's list from Redis.
+func (s *ClaimService) invalidateClaimCaches(ctx context.Context, claimID uuid.UUID) {
+	keys := []string{cache.KeyClaim(claimID.String())}
+	if claim, err := s.repos.Claim.GetClaimByID(ctx, claimID); err == nil {
+		keys = append(keys, cache.KeyClaimList(claim.UserID))
+	}
+	_ = cache.Del(ctx, s.server.Cache, keys...)
 }
 
 func (s *ClaimService) SaveClaimOCRResult(
@@ -361,7 +428,6 @@ func (s *ClaimService) SaveClaimOCRResult(
 	if result.MerchantName != "" {
 		merchantName = &result.MerchantName
 	}
-
 	var receiptDate *time.Time
 	if result.Date != "" {
 		d, err := time.Parse("2006-01-02", result.Date)
@@ -369,33 +435,34 @@ func (s *ClaimService) SaveClaimOCRResult(
 			receiptDate = &d
 		}
 	}
-
 	var amount *float64
 	if result.TotalAmount > 0 {
 		amount = &result.TotalAmount
 	}
-
 	var currency *string
 	if result.Currency != "" {
 		currency = &result.Currency
 	}
-
 	var rawJSON *string
 	if result.RawJSON != "" {
 		rawJSON = &result.RawJSON
 	}
-
-	return s.repos.Claim.SaveOCRResult(
-		ctx,
-		claimID,
-		status,
-		merchantName,
-		receiptDate,
-		amount,
-		currency,
-		rawJSON,
-		dateMismatch,
-	)
+	if err := s.repos.Claim.SaveOCRResult(
+		ctx, claimID, status, merchantName, receiptDate, amount, currency, rawJSON, dateMismatch,
+	); err != nil {
+		return err
+	}
+	// Invalidate both the individual claim and the user's list (amount/status changed)
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err == nil {
+		_ = cache.Del(ctx, s.server.Cache,
+			cache.KeyClaim(claimID.String()),
+			cache.KeyClaimList(claim.UserID),
+		)
+	} else {
+		_ = cache.Del(ctx, s.server.Cache, cache.KeyClaim(claimID.String()))
+	}
+	return nil
 }
 
 func (s *ClaimService) GetClaimForJob(ctx context.Context, claimID uuid.UUID) (*model.Claim, error) {
@@ -413,5 +480,17 @@ func (s *ClaimService) SaveClaimPolicyMatch(
 	if err != nil {
 		return err
 	}
-	return s.repos.Claim.SavePolicyMatch(ctx, claimID, policyID, raw, status)
+	if err := s.repos.Claim.SavePolicyMatch(ctx, claimID, policyID, raw, status); err != nil {
+		return err
+	}
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err == nil {
+		_ = cache.Del(ctx, s.server.Cache,
+			cache.KeyClaim(claimID.String()),
+			cache.KeyClaimList(claim.UserID),
+		)
+	} else {
+		_ = cache.Del(ctx, s.server.Cache, cache.KeyClaim(claimID.String()))
+	}
+	return nil
 }

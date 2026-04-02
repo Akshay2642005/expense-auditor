@@ -1,18 +1,33 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, FileText, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Loader2, ShieldCheck, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePolicyApi } from "@/api/policy";
 
 export default function PolicyPage() {
   const navigate = useNavigate();
-  const { getActivePolicy } = usePolicyApi();
+  const { getActivePolicy, getActivePolicyDownloadUrl } = usePolicyApi();
+  const [opening, setOpening] = useState(false);
 
   const { data: policy, isLoading } = useQuery({
     queryKey: ["policy", "active"],
     queryFn: getActivePolicy,
   });
+
+  const handleViewPolicy = async () => {
+    setOpening(true);
+    try {
+      const url = await getActivePolicyDownloadUrl();
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error("Failed to open policy. Try again.");
+    } finally {
+      setOpening(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,11 +73,14 @@ export default function PolicyPage() {
                   <FileText className="h-5 w-5 text-emerald-500" />
                 </div>
                 <div className="min-w-0 flex-1 space-y-1">
-                  <p className="font-medium text-sm truncate">{policy.name}</p>
+                  <p className="font-semibold text-base truncate">{policy.name}</p>
                   {policy.version && (
-                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                      {policy.version}
-                    </span>
+                    <p className="text-xs text-muted-foreground">
+                      Policy number:{" "}
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">
+                        {policy.version}
+                      </span>
+                    </p>
                   )}
                   <div className="flex flex-wrap gap-3 pt-1 text-xs text-muted-foreground">
                     <span>
@@ -77,6 +95,19 @@ export default function PolicyPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Button
+              className="w-full gap-2"
+              variant="outline"
+              onClick={handleViewPolicy}
+              disabled={opening}
+            >
+              {opening ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Opening…</>
+              ) : (
+                <><ExternalLink className="h-4 w-4" /> View Full Policy</>
+              )}
+            </Button>
 
             <p className="text-center text-xs text-muted-foreground px-4">
               Contact your organization admin to update or replace this policy.

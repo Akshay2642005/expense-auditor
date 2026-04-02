@@ -379,7 +379,7 @@ func ExtractCapsFromChunks(chunks []model.RetrievedChunk) (*float64, *float64) {
 	return mealsCap, lodgingCap
 }
 
-func joinStrings(parts []string, sep string) string {
+func JoinStrings(parts []string, sep string) string {
 	result := ""
 	for i, p := range parts {
 		if p == "" {

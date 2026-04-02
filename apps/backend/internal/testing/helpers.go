@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/Akshay2642005/expense-auditor/internal/server"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -73,4 +73,3 @@ func ProjectRoot(t *testing.T) string {
 func Ptr[T any](v T) *T {
 	return &v
 }
-

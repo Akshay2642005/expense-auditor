@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ClerkCaptcha } from "./ClerkCaptcha";
 import { getClerkError, GitHubIcon, GoogleIcon } from "./utils";
 import { getLastUsedProvider, setLastUsedProvider } from "./lastUsedProvider";
 
@@ -163,6 +164,8 @@ export function LoginPage() {
                   </span>
                 )}
               </Button>
+
+              <ClerkCaptcha />
             </form>
           </CardContent>
 

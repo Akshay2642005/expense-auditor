@@ -24,10 +24,8 @@ import { Separator } from "@/components/ui/separator";
 import { usePolicyApi } from "@/api/policy";
 import type { Policy, PolicyStatus } from "@auditor/zod";
 
-// ─── polling interval for in-progress policies ────────────────────────────────
 const POLL_MS = 10000;
 
-// ─── status helpers ────────────────────────────────────────────────────────────
 const STATUS_META: Record<
   PolicyStatus,
   { label: string; icon: React.ReactNode; variant: "default" | "secondary" | "destructive" | "outline" }
@@ -45,14 +43,7 @@ function isTerminal(status: PolicyStatus) {
   return TERMINAL.includes(status);
 }
 
-// ─── PolicyRow component ───────────────────────────────────────────────────────
-function PolicyRow({
-  policy,
-  isLatest,
-}: {
-  policy: Policy;
-  isLatest: boolean;
-}) {
+function PolicyRow({ policy, isLatest }: { policy: Policy; isLatest: boolean }) {
   const meta = STATUS_META[policy.status] ?? STATUS_META.pending;
   const isIngesting = policy.status === "pending" || policy.status === "ingesting";
 
@@ -66,12 +57,9 @@ function PolicyRow({
     <div
       className={[
         "group relative flex items-start gap-4 rounded-xl border p-4 transition-colors",
-        isLatest
-          ? "border-border bg-card"
-          : "border-border/50 bg-card/50 opacity-80",
+        isLatest ? "border-border bg-card" : "border-border/50 bg-card/50 opacity-80",
       ].join(" ")}
     >
-      {/* Status stripe */}
       <div
         className={[
           "mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg",
@@ -87,12 +75,11 @@ function PolicyRow({
         <FileText className="h-4 w-4" />
       </div>
 
-      {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-medium text-sm">{policy.name}</span>
+          <span className="truncate font-semibold text-sm">{policy.name}</span>
           {policy.version && (
-            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-foreground">
               {policy.version}
             </span>
           )}
@@ -108,8 +95,6 @@ function PolicyRow({
             <span>{policy.chunkCount.toLocaleString()} chunks</span>
           )}
         </div>
-
-        {/* Ingestion progress indicator */}
         {isIngesting && (
           <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -118,11 +103,7 @@ function PolicyRow({
         )}
       </div>
 
-      {/* Badge */}
-      <Badge
-        variant={meta.variant}
-        className="flex-shrink-0 items-center gap-1 text-[11px]"
-      >
+      <Badge variant={meta.variant} className="flex-shrink-0 items-center gap-1 text-[11px]">
         {meta.icon}
         {meta.label}
       </Badge>
@@ -130,7 +111,6 @@ function PolicyRow({
   );
 }
 
-// ─── Upload form ───────────────────────────────────────────────────────────────
 function UploadForm({ onUploaded }: { onUploaded: (p: Policy) => void }) {
   const { uploadPolicy } = usePolicyApi();
   const [file, setFile] = useState<File | null>(null);
@@ -186,7 +166,6 @@ function UploadForm({ onUploaded }: { onUploaded: (p: Policy) => void }) {
 
   return (
     <div className="space-y-5">
-      {/* Drop zone */}
       <div
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -242,7 +221,6 @@ function UploadForm({ onUploaded }: { onUploaded: (p: Policy) => void }) {
         )}
       </div>
 
-      {/* Fields */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="policy-name" className="text-xs font-medium">
@@ -269,11 +247,7 @@ function UploadForm({ onUploaded }: { onUploaded: (p: Policy) => void }) {
         </div>
       </div>
 
-      <Button
-        className="w-full gap-2"
-        onClick={handleSubmit}
-        disabled={uploading || !file}
-      >
+      <Button className="w-full gap-2" onClick={handleSubmit} disabled={uploading || !file}>
         {uploading ? (
           <><Loader2 className="h-4 w-4 animate-spin" /> Uploading…</>
         ) : (
@@ -284,7 +258,6 @@ function UploadForm({ onUploaded }: { onUploaded: (p: Policy) => void }) {
   );
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
 export default function PolicyAdminPage() {
   const navigate = useNavigate();
   const { orgRole } = useAuth();
@@ -295,7 +268,6 @@ export default function PolicyAdminPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Gate: only org:admin should land here
   useEffect(() => {
     if (orgRole !== undefined && orgRole !== "org:admin") {
       navigate("/", { replace: true });
@@ -318,13 +290,10 @@ export default function PolicyAdminPage() {
 
   useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
 
-  // Called by each PolicyRow that is still in-progress
   const handlePoll = useCallback(async (id: string) => {
     try {
       const updated = await getPolicy(id);
-      setPolicies((prev) =>
-        prev.map((p) => (p.id === id ? updated : p))
-      );
+      setPolicies((prev) => prev.map((p) => (p.id === id ? updated : p)));
       if (isTerminal(updated.status)) {
         if (updated.status === "active") {
           toast.success(`Policy "${updated.name}" is now active.`);
@@ -355,16 +324,13 @@ export default function PolicyAdminPage() {
         pollTimerRef.current = setTimeout(tick, POLL_MS);
         return;
       }
-
       if (pollInFlightRef.current) return;
       pollInFlightRef.current = true;
-
       try {
         await Promise.all(inProgress.map((p) => handlePoll(p.id)));
       } finally {
         pollInFlightRef.current = false;
       }
-
       pollTimerRef.current = setTimeout(tick, POLL_MS);
     };
 
@@ -386,15 +352,9 @@ export default function PolicyAdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 px-6 py-4 backdrop-blur">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigate("/")}
-          >
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">
@@ -424,14 +384,18 @@ export default function PolicyAdminPage() {
         {activePolicy && (
           <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
             <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
-            <div className="min-w-0">
-              <p className="font-medium text-sm">Active policy</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {activePolicy.name}
-                {activePolicy.version && ` · ${activePolicy.version}`}
-                {" · "}
-                {activePolicy.chunkCount.toLocaleString()} chunks indexed
-              </p>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm truncate">{activePolicy.name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {activePolicy.version && (
+                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                    {activePolicy.version}
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {activePolicy.chunkCount.toLocaleString()} chunks indexed
+                </span>
+              </div>
             </div>
             <ChevronRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
           </div>
@@ -478,11 +442,7 @@ export default function PolicyAdminPage() {
           ) : (
             <div className="space-y-2">
               {policies.map((p, i) => (
-                <PolicyRow
-                  key={p.id}
-                  policy={p}
-                  isLatest={i === 0}
-                />
+                <PolicyRow key={p.id} policy={p} isLatest={i === 0} />
               ))}
             </div>
           )}

@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Akshay2642005/expense-auditor/internal/config"
+	"github.com/Akshay2642005/expense-auditor/internal/database"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
-	"github.com/Akshay2642005/expense-auditor/internal/config"
-	"github.com/Akshay2642005/expense-auditor/internal/database"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -157,5 +157,3 @@ func (db *TestDB) CleanupTestDB(ctx context.Context, logger *zerolog.Logger) err
 
 	return nil
 }
-
-

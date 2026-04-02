@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/Akshay2642005/expense-auditor/internal/server"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type Middlewares struct {
@@ -28,5 +28,3 @@ func NewMiddlewares(s *server.Server) *Middlewares {
 		RateLimit:       NewRateLimitMiddleware(s),
 	}
 }
-
-

@@ -36,5 +36,3 @@ func (h *OpenAPIHandler) ServeOpenAPIUI(c echo.Context) error {
 
 	return nil
 }
-
-

@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Akshay2642005/expense-auditor/internal/errs"
+	"github.com/Akshay2642005/expense-auditor/internal/server"
 	"github.com/clerk/clerk-sdk-go/v2"
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/labstack/echo/v4"
-	"github.com/Akshay2642005/expense-auditor/internal/errs"
-	"github.com/Akshay2642005/expense-auditor/internal/server"
 )
 
 type AuthMiddleware struct {
@@ -73,5 +73,3 @@ func (auth *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc 
 		return next(c)
 	})
 }
-
-

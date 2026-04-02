@@ -21,5 +21,3 @@ func (r *RateLimitMiddleware) RecordRateLimitHit(endpoint string) {
 		})
 	}
 }
-
-

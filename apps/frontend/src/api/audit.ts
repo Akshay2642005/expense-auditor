@@ -14,8 +14,12 @@ function useAuthHeaders() {
   const { getToken } = useAuth();
 
   return useCallback(async (): Promise<Record<string, string>> => {
-    const token = await getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    for (let i = 0; i < 5; i++) {
+      const token = await getToken();
+      if (token) return { Authorization: `Bearer ${token}` };
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    throw new Error("Auth token unavailable");
   }, [getToken]);
 }
 

@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Akshay2642005/expense-auditor/internal/errs"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
-	"github.com/Akshay2642005/expense-auditor/internal/errs"
 )
 
 type Validatable interface {
@@ -112,5 +112,3 @@ var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4
 func IsValidUUID(uuid string) bool {
 	return uuidRegex.MatchString(uuid)
 }
-
-

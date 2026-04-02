@@ -5,6 +5,7 @@ import (
 
 	"github.com/Akshay2642005/expense-auditor/internal/errs"
 	"github.com/Akshay2642005/expense-auditor/internal/middleware"
+	"github.com/Akshay2642005/expense-auditor/internal/model"
 	"github.com/Akshay2642005/expense-auditor/internal/server"
 	"github.com/Akshay2642005/expense-auditor/internal/service"
 	"github.com/google/uuid"
@@ -46,6 +47,37 @@ func (h *PolicyHandler) GetActivePolicy(c echo.Context) error {
 		return c.JSON(http.StatusOK, nil)
 	}
 	return c.JSON(http.StatusOK, policy)
+}
+
+// DownloadActivePolicy handles GET /api/v1/policy/active/download — streams the active policy PDF.
+func (h *PolicyHandler) DownloadActivePolicy(c echo.Context) error {
+	ctx := c.Request().Context()
+	orgID := middleware.GetOrgID(c)
+
+	var policy *model.Policy
+	var err error
+
+	if orgID != "" {
+		policy, err = h.policyService.GetActivePolicyForJob(ctx, orgID)
+	}
+	if policy == nil {
+		userID := middleware.GetUserID(c)
+		if userID == "" {
+			return echo.NewHTTPError(http.StatusNotFound, "no active policy")
+		}
+		policy, err = h.policyService.GetActivePolicyForUser(ctx, userID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound, "no active policy")
+		}
+	}
+
+	data, contentType, err := h.server.GCS.Download(ctx, policy.GCSPath)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to retrieve policy file")
+	}
+
+	c.Response().Header().Set("Content-Disposition", `inline; filename="policy.pdf"`)
+	return c.Blob(http.StatusOK, contentType, data)
 }
 
 // UploadPolicy handles POST /api/v1/admin/policy

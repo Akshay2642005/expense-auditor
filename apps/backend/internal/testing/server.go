@@ -3,10 +3,10 @@ package testing
 import (
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/Akshay2642005/expense-auditor/internal/config"
 	"github.com/Akshay2642005/expense-auditor/internal/database"
 	"github.com/Akshay2642005/expense-auditor/internal/server"
+	"github.com/rs/zerolog"
 )
 
 // CreateTestServer creates a server instance for testing
@@ -23,7 +23,7 @@ func CreateTestServer(logger *zerolog.Logger, db *TestDB) *server.Server {
 			},
 			NewRelic: config.NewRelicConfig{
 				LicenseKey:                "",    // Empty for tests
-				AppLogForwardingEnabled:   false, // Disabled for tests  
+				AppLogForwardingEnabled:   false, // Disabled for tests
 				DistributedTracingEnabled: false, // Disabled for tests
 				DebugLogging:              false, // Disabled for tests
 			},
@@ -43,4 +43,3 @@ func CreateTestServer(logger *zerolog.Logger, db *TestDB) *server.Server {
 
 	return testServer
 }
-
