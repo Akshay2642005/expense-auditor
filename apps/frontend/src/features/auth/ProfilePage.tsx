@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useOrganizationApi } from "@/api/organization";
 
 function initials(first?: string | null, last?: string | null) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -38,6 +39,7 @@ export function ProfilePage() {
   const [inviting, setInviting] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [creatingOrg, setCreatingOrg] = useState(false);
+  const { createInvitation } = useOrganizationApi();
 
   const isAdmin = membership?.role === "org:admin";
 
@@ -100,7 +102,7 @@ export function ProfilePage() {
     if (!organization || !inviteEmail.trim()) return;
     setInviting(true);
     try {
-      await organization.inviteMember({ emailAddress: inviteEmail.trim(), role: "org:member" });
+      await createInvitation({ emailAddress: inviteEmail.trim(), role: "org:member" });
       toast.success(`Invite sent to ${inviteEmail.trim()}`);
       setInviteEmail("");
     } catch {

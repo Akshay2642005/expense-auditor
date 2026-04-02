@@ -9,6 +9,7 @@ import { VerifyEmailPage } from "@/features/auth/VerifyEmailPage.tsx";
 import { SSOCallbackPage } from "@/features/auth/SSOCallbackPage.tsx";
 import { ProfilePage } from "@/features/auth/ProfilePage.tsx";
 import { CreateOrgPage } from "@/features/auth/CreateOrgPage.tsx";
+import { AcceptInvitationPage } from "@/features/auth/AcceptInvitationPage.tsx";
 import { SubmitClaimPage } from "@/features/claims/SubmitClaimPage.tsx";
 import { ClaimStatusPage } from "@/features/claims/ClaimStatusPage.tsx";
 import { ClaimsListPage } from "@/features/claims/ClaimsListPage.tsx";
@@ -59,6 +60,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/sso-callback" element={<SSOCallbackPage />} />
         <Route path="/create-org" element={<ProtectedRoute><CreateOrgPage /></ProtectedRoute>} />

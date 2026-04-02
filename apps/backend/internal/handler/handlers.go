@@ -10,6 +10,7 @@ type Handlers struct {
 	OpenAPI      *OpenAPIHandler
 	Claim        *ClaimHandler
 	Policy       *PolicyHandler
+	Organization *OrganizationHandler
 	AuditHandler *AuditHandler
 }
 
@@ -19,6 +20,7 @@ func NewHandlers(s *server.Server, services *service.Services) *Handlers {
 		OpenAPI:      NewOpenAPIHandler(s),
 		Claim:        NewClaimHandler(s, services.Claim),
 		Policy:       NewPolicyHandler(s, services.Policy),
+		Organization: NewOrganizationHandler(s, services.Auth),
 		AuditHandler: NewAuditHandler(s, services.Audit),
 	}
 }

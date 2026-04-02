@@ -45,6 +45,7 @@ import type { AuditResponse, ClaimResponse } from "@auditor/zod";
 import { cn } from "@/lib/utils";
 import { usePolicyApi } from "@/api/policy";
 import { useAuditApi } from "@/api/audit";
+import { useOrganizationApi } from "@/api/organization";
 
 // ─── status meta ──────────────────────────────────────────────────────────────
 
@@ -369,6 +370,7 @@ export function ClaimsListPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const { getActivePolicy } = usePolicyApi();
+  const { createInvitation } = useOrganizationApi();
 
   // Only fire queries once Clerk has fully loaded and confirmed the user is signed in.
   // resolveToken retries up to 5× with 200ms gaps, covering the brief window after
@@ -410,7 +412,7 @@ export function ClaimsListPage() {
     if (!organization || !inviteEmail.trim()) return;
     setInviting(true);
     try {
-      await organization.inviteMember({ emailAddress: inviteEmail.trim(), role: "org:member" });
+      await createInvitation({ emailAddress: inviteEmail.trim(), role: "org:member" });
       toast.success(`Invite sent to ${inviteEmail.trim()}`);
       setInviteEmail("");
       setInviteOpen(false);
