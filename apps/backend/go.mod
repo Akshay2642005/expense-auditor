@@ -23,7 +23,7 @@ require (
 	github.com/newrelic/go-agent/v3/integrations/nrredis-v9 v1.1.1
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/resend/resend-go/v2 v2.21.0
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.11.1
