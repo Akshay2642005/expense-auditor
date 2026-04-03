@@ -29,6 +29,16 @@ func registerClaimRoutes(g *echo.Group, h *handler.Handlers) {
 		)(c)
 	})
 
+	// GET /api/v1/admin/claims
+	admin.GET("", func(c echo.Context) error {
+		return handler.Handle(
+			h.Claim.Handler,
+			h.Claim.ListAdminClaims,
+			http.StatusOK,
+			&handler.ListAdminClaimsRequest{},
+		)(c)
+	})
+
 	// GET /api/v1/claims/:id/receipt — streams the file bytes from GCS
 	claims.GET("/:id/receipt", h.Claim.GetReceipt)
 

@@ -1,6 +1,10 @@
 import { initContract } from "@ts-rest/core";
 import { z } from "zod";
-import { ZClaimResponse, ZSubmitClaimResponse } from "@auditor/zod";
+import {
+  ZAdminClaimListQuery,
+  ZClaimResponse,
+  ZSubmitClaimResponse,
+} from "@auditor/zod";
 
 const c = initContract();
 
@@ -8,11 +12,11 @@ const ZErrorResponse = z.object({
   message: z.string(),
 });
 
-
 export const claimContract = c.router({
   submitClaim: {
     summary: "Submit an expense claim",
-    description: "Multipart form-data: file (JPG/PNG/PDF) + business_purpose + claimed_date + expense_category",
+    description:
+      "Multipart form-data: file (JPG/PNG/PDF) + business_purpose + claimed_date + expense_category",
     method: "POST",
     path: "/v1/claims",
     // Multipart upload — use FormData on the client side via axios directly
@@ -32,6 +36,17 @@ export const claimContract = c.router({
       401: ZErrorResponse,
     },
   },
+  listAdminClaims: {
+    summary: "List admin review claims with search, filters, and sorting",
+    method: "GET",
+    path: "/v1/admin/claims",
+    query: ZAdminClaimListQuery,
+    responses: {
+      200: z.array(ZClaimResponse),
+      401: ZErrorResponse,
+      403: ZErrorResponse,
+    },
+  },
 
   getClaim: {
     summary: "Get a single claim by ID",
@@ -45,4 +60,4 @@ export const claimContract = c.router({
       404: ZErrorResponse,
     },
   },
-})
+});

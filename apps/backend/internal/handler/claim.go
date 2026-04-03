@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Akshay2642005/expense-auditor/internal/errs"
@@ -148,7 +149,12 @@ func (h *ClaimHandler) ListClaims(c echo.Context, _ *ListClaimsRequest) (any, er
 		if orgID == "" {
 			return []model.Claim{}, nil
 		}
-		claims, err = h.claimService.GetAdminReviewClaims(c.Request().Context(), orgID, userID)
+		claims, err = h.claimService.GetAdminReviewClaims(
+			c.Request().Context(),
+			orgID,
+			userID,
+			model.DefaultAdminClaimFilters(),
+		)
 	} else {
 		claims, err = h.claimService.GetUserClaims(c.Request().Context(), userID)
 	}
@@ -157,6 +163,190 @@ func (h *ClaimHandler) ListClaims(c echo.Context, _ *ListClaimsRequest) (any, er
 	}
 
 	return claims, nil
+}
+
+type ListAdminClaimsRequest struct {
+	Query          string `query:"q"`
+	Statuses       string `query:"statuses"`
+	UploaderUserID string `query:"uploaderUserId"`
+	Flagged        string `query:"flagged"`
+	DateField      string `query:"dateField"`
+	DateFrom       string `query:"dateFrom"`
+	DateTo         string `query:"dateTo"`
+	SortBy         string `query:"sortBy"`
+	SortDir        string `query:"sortDir"`
+}
+
+func (r *ListAdminClaimsRequest) Validate() error {
+	validStatuses := map[string]bool{
+		"pending":        true,
+		"processing":     true,
+		"ocr_complete":   true,
+		"needs_review":   true,
+		"ocr_failed":     true,
+		"policy_matched": true,
+		"auditing":       true,
+		"approved":       true,
+		"flagged":        true,
+		"rejected":       true,
+	}
+
+	if r.Statuses != "" {
+		for _, status := range strings.Split(r.Statuses, ",") {
+			trimmedStatus := strings.TrimSpace(status)
+			if trimmedStatus == "" {
+				continue
+			}
+			if !validStatuses[trimmedStatus] {
+				return errs.NewBadRequestError(
+					"statuses contains an unsupported claim status",
+					true, nil, nil, nil,
+				)
+			}
+		}
+	}
+
+	if r.Flagged != "" &&
+		r.Flagged != string(model.AdminClaimFlagFilterAll) &&
+		r.Flagged != string(model.AdminClaimFlagFilterFlagged) &&
+		r.Flagged != string(model.AdminClaimFlagFilterUnflagged) {
+		return errs.NewBadRequestError(
+			"flagged must be one of: all, flagged, unflagged",
+			true, nil, nil, nil,
+		)
+	}
+
+	if r.DateField != "" &&
+		r.DateField != string(model.AdminClaimDateFieldSubmitted) &&
+		r.DateField != string(model.AdminClaimDateFieldClaimed) {
+		return errs.NewBadRequestError(
+			"dateField must be one of: submitted, claimed",
+			true, nil, nil, nil,
+		)
+	}
+
+	if r.SortBy != "" {
+		validSorts := map[string]bool{
+			"submittedDate": true,
+			"claimedDate":   true,
+			"amount":        true,
+			"status":        true,
+			"merchant":      true,
+		}
+		if !validSorts[r.SortBy] {
+			return errs.NewBadRequestError(
+				"sortBy must be one of: submittedDate, claimedDate, amount, status, merchant",
+				true, nil, nil, nil,
+			)
+		}
+	}
+
+	if r.SortDir != "" &&
+		r.SortDir != string(model.ClaimSortDirectionAsc) &&
+		r.SortDir != string(model.ClaimSortDirectionDesc) {
+		return errs.NewBadRequestError(
+			"sortDir must be one of: asc, desc",
+			true, nil, nil, nil,
+		)
+	}
+
+	if r.DateFrom != "" {
+		if _, err := time.Parse("2006-01-02", r.DateFrom); err != nil {
+			return errs.NewBadRequestError(
+				"dateFrom must be in YYYY-MM-DD format",
+				true, nil, nil, nil,
+			)
+		}
+	}
+
+	if r.DateTo != "" {
+		if _, err := time.Parse("2006-01-02", r.DateTo); err != nil {
+			return errs.NewBadRequestError(
+				"dateTo must be in YYYY-MM-DD format",
+				true, nil, nil, nil,
+			)
+		}
+	}
+
+	if r.DateFrom != "" && r.DateTo != "" && r.DateFrom > r.DateTo {
+		return errs.NewBadRequestError(
+			"dateFrom must be earlier than or equal to dateTo",
+			true, nil, nil, nil,
+		)
+	}
+
+	return nil
+}
+
+func (r *ListAdminClaimsRequest) ToFilters() (model.AdminClaimFilters, error) {
+	filters := model.DefaultAdminClaimFilters()
+	filters.Query = strings.TrimSpace(r.Query)
+	filters.UploaderUserID = strings.TrimSpace(r.UploaderUserID)
+
+	if r.Statuses != "" {
+		statuses := make([]model.ClaimStatus, 0)
+		for _, status := range strings.Split(r.Statuses, ",") {
+			trimmedStatus := strings.TrimSpace(status)
+			if trimmedStatus == "" {
+				continue
+			}
+			statuses = append(statuses, model.ClaimStatus(trimmedStatus))
+		}
+		filters.Statuses = statuses
+	}
+
+	if r.Flagged != "" {
+		filters.FlaggedFilter = model.AdminClaimFlagFilter(r.Flagged)
+	}
+	if r.DateField != "" {
+		filters.DateField = model.AdminClaimDateField(r.DateField)
+	}
+	if r.SortBy != "" {
+		filters.SortBy = model.AdminClaimSortBy(r.SortBy)
+	}
+	if r.SortDir != "" {
+		filters.SortDirection = model.ClaimSortDirection(r.SortDir)
+	}
+	if r.DateFrom != "" {
+		dateFrom, err := time.Parse("2006-01-02", r.DateFrom)
+		if err != nil {
+			return model.AdminClaimFilters{}, err
+		}
+		filters.DateFrom = &dateFrom
+	}
+	if r.DateTo != "" {
+		dateTo, err := time.Parse("2006-01-02", r.DateTo)
+		if err != nil {
+			return model.AdminClaimFilters{}, err
+		}
+		filters.DateTo = &dateTo
+	}
+
+	return filters, nil
+}
+
+func (h *ClaimHandler) ListAdminClaims(c echo.Context, req *ListAdminClaimsRequest) (any, error) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return nil, errs.NewUnauthorizedError("unauthorized", false)
+	}
+
+	orgID := middleware.GetOrgID(c)
+	if orgID == "" {
+		return []model.Claim{}, nil
+	}
+
+	filters, err := req.ToFilters()
+	if err != nil {
+		return nil, errs.NewBadRequestError("invalid admin claim filters", true, nil, nil, nil)
+	}
+
+	return h.claimService.GetAdminReviewClaims(
+		c.Request().Context(),
+		orgID,
+		userID,
+		filters,
+	)
 }
 
 // --- GET /api/v1/claims/:id ---

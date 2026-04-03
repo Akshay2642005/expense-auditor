@@ -299,19 +299,35 @@ func (s *ClaimService) GetUserClaims(ctx context.Context, userID string) ([]mode
 // GetAdminReviewClaims returns org claims that were submitted by regular members.
 // Claims owned by the current admin are excluded so legacy self-submissions
 // do not appear in the review queue.
-func (s *ClaimService) GetAdminReviewClaims(ctx context.Context, orgID string, adminUserID string) ([]model.Claim, error) {
-	key := cache.KeyAdminClaimList(orgID, adminUserID)
-	if cached, ok, _ := cache.Get[[]model.Claim](ctx, s.server.Cache, key); ok {
-		s.server.Logger.Debug().Str("key", key).Msg("cache hit: admin claim list")
-		return *cached, nil
+func (s *ClaimService) GetAdminReviewClaims(
+	ctx context.Context,
+	orgID string,
+	adminUserID string,
+	filters model.AdminClaimFilters,
+) ([]model.Claim, error) {
+	filters = filters.Normalized()
+
+	if filters.IsDefault() {
+		key := cache.KeyAdminClaimList(orgID, adminUserID)
+		if cached, ok, _ := cache.Get[[]model.Claim](ctx, s.server.Cache, key); ok {
+			s.server.Logger.Debug().Str("key", key).Msg("cache hit: admin claim list")
+			return *cached, nil
+		}
+
+		claims, err := s.repos.Claim.GetClaimsForAdminReview(ctx, orgID, adminUserID, filters)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list admin review claims: %w", err)
+		}
+
+		_ = cache.Set(ctx, s.server.Cache, key, claims, cache.TTLClaimList)
+		return claims, nil
 	}
 
-	claims, err := s.repos.Claim.GetClaimsForAdminReview(ctx, orgID, adminUserID)
+	claims, err := s.repos.Claim.GetClaimsForAdminReview(ctx, orgID, adminUserID, filters)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list admin review claims: %w", err)
+		return nil, fmt.Errorf("failed to list filtered admin review claims: %w", err)
 	}
 
-	_ = cache.Set(ctx, s.server.Cache, key, claims, cache.TTLClaimList)
 	return claims, nil
 }
 

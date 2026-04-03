@@ -10,6 +10,7 @@ type PublicUserData = {
 
 type OrganizationMembership = {
   publicUserData?: PublicUserData;
+  role?: string;
 };
 
 type OrganizationMembershipPage = {
@@ -20,6 +21,7 @@ type OrganizationMembershipPage = {
 export type OrganizationMemberDirectoryEntry = {
   email: string | null;
   fullName: string | null;
+  role: string | null;
 };
 
 type OrganizationMemberDirectory = Record<
@@ -78,6 +80,7 @@ export function useOrganizationMemberDirectory(enabled = true) {
           directory[publicUserData.userId] = {
             email: publicUserData.identifier || null,
             fullName: buildFullName(publicUserData),
+            role: membership.role ?? null,
           };
         }
 

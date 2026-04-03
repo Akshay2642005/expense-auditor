@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Akshay2642005/expense-auditor/internal/model"
@@ -14,6 +15,14 @@ import (
 type ClaimRepository struct {
 	db *pgxpool.Pool
 }
+
+const claimSelectColumns = `
+		id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
+		status, merchant_name, receipt_date, amount, currency,
+		ocr_raw_json::text AS ocr_raw_json,
+		date_mismatch, ocr_error, created_at, updated_at,
+		policy_id, policy_chunks_used::text AS policy_chunks_used
+`
 
 func NewClaimRepository(db *pgxpool.Pool) *ClaimRepository {
 	return &ClaimRepository{db: db}
@@ -82,16 +91,12 @@ func (r *ClaimRepository) FindReceiptFileByHash(ctx context.Context, hash string
 
 // GetClaimByID fetches a single claim by its UUID.
 func (r *ClaimRepository) GetClaimByID(ctx context.Context, id uuid.UUID) (*model.Claim, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
-			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
-			status, merchant_name, receipt_date, amount, currency,
-			ocr_raw_json::text AS ocr_raw_json,
-			date_mismatch, ocr_error, created_at, updated_at,
-			policy_id, policy_chunks_used::text AS policy_chunks_used
+			%s
 		FROM claims
 		WHERE id = $1
-	`, id)
+	`, claimSelectColumns), id)
 	if err != nil {
 		return nil, fmt.Errorf("get claim by id: %w", err)
 	}
@@ -106,17 +111,13 @@ func (r *ClaimRepository) GetClaimByID(ctx context.Context, id uuid.UUID) (*mode
 
 // GetClaimsByUserID returns all claims for a given Clerk user ID, newest first.
 func (r *ClaimRepository) GetClaimsByUserID(ctx context.Context, userID string) ([]model.Claim, error) {
-	rows, err := r.db.Query(ctx, `
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
 		SELECT
-			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
-			status, merchant_name, receipt_date, amount, currency,
-			ocr_raw_json::text AS ocr_raw_json,
-			date_mismatch, ocr_error, created_at, updated_at,
-			policy_id, policy_chunks_used::text AS policy_chunks_used
+			%s
 		FROM claims
 		WHERE user_id = $1
 		ORDER BY created_at DESC
-	`, userID)
+	`, claimSelectColumns), userID)
 	if err != nil {
 		return nil, fmt.Errorf("get claims by user: %w", err)
 	}
@@ -131,20 +132,102 @@ func (r *ClaimRepository) GetClaimsByUserID(ctx context.Context, userID string) 
 
 // GetClaimsForAdminReview returns org claims that were submitted by members,
 // excluding claims owned by the current admin reviewer.
-func (r *ClaimRepository) GetClaimsForAdminReview(ctx context.Context, orgID string, excludedUserID string) ([]model.Claim, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *ClaimRepository) GetClaimsForAdminReview(
+	ctx context.Context,
+	orgID string,
+	excludedUserID string,
+	filters model.AdminClaimFilters,
+) ([]model.Claim, error) {
+	filters = filters.Normalized()
+
+	var query strings.Builder
+	query.WriteString(`
 		SELECT
-			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
-			status, merchant_name, receipt_date, amount, currency,
-			ocr_raw_json::text AS ocr_raw_json,
-			date_mismatch, ocr_error, created_at, updated_at,
-			policy_id, policy_chunks_used::text AS policy_chunks_used
+	`)
+	query.WriteString(claimSelectColumns)
+	query.WriteString(`
 		FROM claims
 		WHERE org_id = $1
 		  AND submitted_by_role = 'org:member'
 		  AND user_id <> $2
-		ORDER BY created_at DESC
-	`, orgID, excludedUserID)
+	`)
+
+	args := []any{orgID, excludedUserID}
+	nextArg := 3
+
+	if filters.Query != "" {
+		pattern := "%" + filters.Query + "%"
+		query.WriteString(fmt.Sprintf(`
+		  AND (
+			COALESCE(merchant_name, '') ILIKE $%d
+			OR business_purpose ILIKE $%d
+			OR COALESCE(ocr_error, '') ILIKE $%d
+			OR expense_category::text ILIKE $%d
+			OR COALESCE(currency, '') ILIKE $%d
+			OR CAST(id AS TEXT) ILIKE $%d
+		  )
+		`, nextArg, nextArg, nextArg, nextArg, nextArg, nextArg))
+		args = append(args, pattern)
+		nextArg++
+	}
+
+	if len(filters.Statuses) > 0 {
+		placeholders := make([]string, 0, len(filters.Statuses))
+		for _, status := range filters.Statuses {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", nextArg))
+			args = append(args, string(status))
+			nextArg++
+		}
+
+		query.WriteString(`
+		  AND status IN (` + strings.Join(placeholders, ", ") + `)
+		`)
+	}
+
+	if filters.UploaderUserID != "" {
+		query.WriteString(fmt.Sprintf(`
+		  AND user_id = $%d
+		`, nextArg))
+		args = append(args, filters.UploaderUserID)
+		nextArg++
+	}
+
+	switch filters.FlaggedFilter {
+	case model.AdminClaimFlagFilterFlagged:
+		query.WriteString(`
+		  AND status = 'flagged'
+		`)
+	case model.AdminClaimFlagFilterUnflagged:
+		query.WriteString(`
+		  AND status <> 'flagged'
+		`)
+	}
+
+	dateColumn := "created_at::date"
+	if filters.DateField == model.AdminClaimDateFieldClaimed {
+		dateColumn = "claimed_date"
+	}
+
+	if filters.DateFrom != nil {
+		query.WriteString(fmt.Sprintf(`
+		  AND %s >= $%d
+		`, dateColumn, nextArg))
+		args = append(args, *filters.DateFrom)
+		nextArg++
+	}
+
+	if filters.DateTo != nil {
+		query.WriteString(fmt.Sprintf(`
+		  AND %s <= $%d
+		`, dateColumn, nextArg))
+		args = append(args, *filters.DateTo)
+		nextArg++
+	}
+
+	query.WriteString(`
+		ORDER BY ` + adminClaimSortExpression(filters.SortBy, filters.SortDirection))
+
+	rows, err := r.db.Query(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("get claims for admin review: %w", err)
 	}
@@ -155,6 +238,38 @@ func (r *ClaimRepository) GetClaimsForAdminReview(ctx context.Context, orgID str
 	}
 
 	return claims, nil
+}
+
+func adminClaimSortExpression(sortBy model.AdminClaimSortBy, direction model.ClaimSortDirection) string {
+	sortDirection := "DESC"
+	if direction == model.ClaimSortDirectionAsc {
+		sortDirection = "ASC"
+	}
+
+	switch sortBy {
+	case model.AdminClaimSortByClaimedDate:
+		return fmt.Sprintf("claimed_date %s, created_at DESC", sortDirection)
+	case model.AdminClaimSortByAmount:
+		return fmt.Sprintf("amount %s NULLS LAST, created_at DESC", sortDirection)
+	case model.AdminClaimSortByStatus:
+		return fmt.Sprintf(`CASE status
+			WHEN 'flagged' THEN 1
+			WHEN 'needs_review' THEN 2
+			WHEN 'ocr_failed' THEN 3
+			WHEN 'auditing' THEN 4
+			WHEN 'processing' THEN 5
+			WHEN 'pending' THEN 6
+			WHEN 'ocr_complete' THEN 7
+			WHEN 'policy_matched' THEN 8
+			WHEN 'approved' THEN 9
+			WHEN 'rejected' THEN 10
+			ELSE 99
+		END %s, created_at DESC`, sortDirection)
+	case model.AdminClaimSortByMerchant:
+		return fmt.Sprintf("LOWER(COALESCE(merchant_name, business_purpose)) %s, created_at DESC", sortDirection)
+	default:
+		return fmt.Sprintf("created_at %s", sortDirection)
+	}
 }
 
 // GetReceiptFileByClaimID returns the receipt_file linked to a claim.

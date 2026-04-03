@@ -47,6 +47,7 @@ const TERMINAL_STATUSES = new Set([
   "ocr_complete",
   "needs_review",
   "ocr_failed",
+  "policy_matched",
   "auditing",
   "approved",
   "flagged",
@@ -79,6 +80,12 @@ const statusConfig: Record<
     icon: Eye,
     variant: "default",
     color: "text-primary",
+  },
+  policy_matched: {
+    label: "Policy Matched",
+    icon: CheckCircle2,
+    variant: "outline",
+    color: "text-emerald-600 dark:text-emerald-400",
   },
   needs_review: {
     label: "Needs Review",
