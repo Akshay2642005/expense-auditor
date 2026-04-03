@@ -183,6 +183,9 @@ export function ClaimStatusPage() {
   const cfg = statusConfig[claim.status] ?? statusConfig["pending"]!;
   const Icon = cfg.icon;
   const isLive = !TERMINAL_STATUSES.has(claim.status);
+  const issueBannerClass = claim.status === "ocr_failed"
+    ? "bg-destructive/10 text-destructive"
+    : "bg-amber-500/10 text-amber-700 dark:text-amber-300";
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
@@ -205,7 +208,7 @@ export function ClaimStatusPage() {
               <p className="text-xs text-muted-foreground">Checking for updates…</p>
             )}
             {claim.ocrError && (
-              <p className="max-w-sm rounded bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+              <p className={cn("max-w-sm rounded px-3 py-1.5 text-xs", issueBannerClass)}>
                 {claim.ocrError}
               </p>
             )}

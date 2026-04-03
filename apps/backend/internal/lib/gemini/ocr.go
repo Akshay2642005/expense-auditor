@@ -13,12 +13,13 @@ import (
 // It is stored as-is in claims.ocr_raw_json and individual columns are
 // promoted to the claim row after validation.
 type OCRResult struct {
-	MerchantName string  `json:"merchant_name"`
-	Date         string  `json:"date"`
-	TotalAmount  float64 `json:"total_amount"`
-	Currency     string  `json:"currency"`
-	Confidence   float64 `json:"confidence"`
-	RawJSON      string  `json:"-"`
+	MerchantName         string                `json:"merchant_name"`
+	Date                 string                `json:"date"`
+	TotalAmount          float64               `json:"total_amount"`
+	Currency             string                `json:"currency"`
+	Confidence           float64               `json:"confidence"`
+	BusinessPurposeCheck *BusinessPurposeCheck `json:"business_purpose_check,omitempty"`
+	RawJSON              string                `json:"-"`
 }
 
 type ocrResultRaw struct {
@@ -54,6 +55,14 @@ func confidenceValue(raw ocrResultRaw) float64 {
 		return 0
 	}
 	return *raw.Confidence
+}
+
+func (r OCRResult) StorageJSON() (string, error) {
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return "", fmt.Errorf("gemini: marshal OCR storage JSON: %w", err)
+	}
+	return string(raw), nil
 }
 
 const ocrPrompt = `Extract information from this receipt image and return ONLY a valid JSON object with no markdown, no backticks, and no explanation:

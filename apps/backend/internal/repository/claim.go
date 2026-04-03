@@ -186,6 +186,7 @@ func (r *ClaimRepository) SaveOCRResult(
 	currency *string,
 	rawJSON *string,
 	dateMismatch bool,
+	ocrError *string,
 ) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE claims SET
@@ -196,9 +197,10 @@ func (r *ClaimRepository) SaveOCRResult(
 			currency      = $5,
 			ocr_raw_json  = $6::jsonb,
 			date_mismatch = $7,
+			ocr_error     = $8,
 			updated_at    = now()
-		WHERE id = $8
-	`, string(status), merchantName, receiptDate, amount, currency, rawJSON, dateMismatch, claimID)
+		WHERE id = $9
+	`, string(status), merchantName, receiptDate, amount, currency, rawJSON, dateMismatch, ocrError, claimID)
 	if err != nil {
 		return fmt.Errorf("save ocr result: %w", err)
 	}

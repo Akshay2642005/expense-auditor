@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
 	"time"
 
+	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
 	"github.com/Akshay2642005/expense-auditor/internal/model"
 	"github.com/hibiken/asynq"
 )
@@ -39,12 +41,19 @@ func (j *JobService) handleOCRReceiptTask(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("ocr: gemini extract: %w", err)
 	}
 
+	claim, err := j.claimService.GetClaimForJob(ctx, claimID)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to load claim for OCR verification")
+		return fmt.Errorf("ocr: load claim: %w", err)
+	}
+
 	status := model.ClaimStatusOCRComplete
 	if result.Confidence < 0.5 {
 		status = model.ClaimStatusNeedsReview
 	}
 
 	dateMismatch := false
+	var reviewReason *string
 	claimedDate, parseErr := time.Parse(time.RFC3339, payload.ClaimedDate)
 	if parseErr == nil && result.Date != "" {
 		receiptDate, dateErr := time.Parse("2006-01-02", result.Date)
@@ -62,7 +71,33 @@ func (j *JobService) handleOCRReceiptTask(ctx context.Context, t *asynq.Task) er
 		}
 	}
 
-	if err := j.claimService.SaveClaimOCRResult(ctx, claimID, result, status, dateMismatch); err != nil {
+	check, err := ocrGeminiClient.AssessBusinessPurposeConsistency(
+		ctx,
+		claim.BusinessPurpose,
+		string(claim.ExpenseCategory),
+		result.MerchantName,
+		strconv.FormatFloat(result.TotalAmount, 'f', -1, 64),
+		result.Currency,
+		result.Date,
+	)
+	if err != nil {
+		log.Warn().Err(err).Msg("business purpose consistency check failed")
+	} else {
+		result.BusinessPurposeCheck = check
+		log.Info().
+			Str("business_purpose_verdict", check.Verdict).
+			Float64("business_purpose_confidence", check.Confidence).
+			Msg("business purpose consistency evaluated")
+
+		if shouldReviewBusinessPurposeMismatch(check) {
+			status = model.ClaimStatusNeedsReview
+			reason := check.Reason
+			reviewReason = &reason
+			log.Warn().Msg("business purpose mismatch detected; marking claim for review")
+		}
+	}
+
+	if err := j.claimService.SaveClaimOCRResult(ctx, claimID, result, status, dateMismatch, reviewReason); err != nil {
 		log.Error().Err(err).Msg("failed to save OCR result")
 		return err
 	}
@@ -73,4 +108,8 @@ func (j *JobService) handleOCRReceiptTask(ctx context.Context, t *asynq.Task) er
 	}
 
 	return nil
+}
+
+func shouldReviewBusinessPurposeMismatch(check *gemini.BusinessPurposeCheck) bool {
+	return check != nil && check.Verdict == "mismatch" && check.Confidence >= 0.7
 }

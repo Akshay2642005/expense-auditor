@@ -37,7 +37,7 @@ var (
 type ClaimJobService interface {
 	SetClaimJobStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error
 	MarkClaimOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error
-	SaveClaimOCRResult(ctx context.Context, claimID uuid.UUID, result *gemini.OCRResult, status model.ClaimStatus, dateMismatch bool) error
+	SaveClaimOCRResult(ctx context.Context, claimID uuid.UUID, result *gemini.OCRResult, status model.ClaimStatus, dateMismatch bool, reviewReason *string) error
 	GetClaimForJob(ctx context.Context, claimID uuid.UUID) (*model.Claim, error)
 	SaveClaimPolicyMatch(ctx context.Context, claimID uuid.UUID, policyID uuid.UUID, chunks []model.RetrievedChunk, status model.ClaimStatus) error
 	SetClaimOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error

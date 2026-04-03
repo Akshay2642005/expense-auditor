@@ -423,6 +423,7 @@ func (s *ClaimService) SaveClaimOCRResult(
 	result *gemini.OCRResult,
 	status model.ClaimStatus,
 	dateMismatch bool,
+	reviewReason *string,
 ) error {
 	var merchantName *string
 	if result.MerchantName != "" {
@@ -444,11 +445,13 @@ func (s *ClaimService) SaveClaimOCRResult(
 		currency = &result.Currency
 	}
 	var rawJSON *string
-	if result.RawJSON != "" {
+	if storedJSON, err := result.StorageJSON(); err == nil {
+		rawJSON = &storedJSON
+	} else if result.RawJSON != "" {
 		rawJSON = &result.RawJSON
 	}
 	if err := s.repos.Claim.SaveOCRResult(
-		ctx, claimID, status, merchantName, receiptDate, amount, currency, rawJSON, dateMismatch,
+		ctx, claimID, status, merchantName, receiptDate, amount, currency, rawJSON, dateMismatch, reviewReason,
 	); err != nil {
 		return err
 	}
