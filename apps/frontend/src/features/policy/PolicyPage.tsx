@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, ExternalLink, FileText, Loader2, ShieldCheck, XCircle } from "lucide-react";
@@ -6,15 +7,25 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePolicyApi } from "@/api/policy";
+import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 
 export default function PolicyPage() {
   const navigate = useNavigate();
   const { getActivePolicy, getActivePolicyDownloadUrl } = usePolicyApi();
   const [opening, setOpening] = useState(false);
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
+  const {
+    orgId: activeOrgId,
+    isReady: isActiveOrgReady,
+    isWaitingForActivation: isWaitingForActiveOrg,
+  } = useActiveOrganizationReady();
+  const isPolicyLoading = !authLoaded || isWaitingForActiveOrg;
 
   const { data: policy, isLoading } = useQuery({
-    queryKey: ["policy", "active"],
+    queryKey: ["policy", "active", activeOrgId ?? "no-active-org"],
     queryFn: getActivePolicy,
+    enabled: authLoaded && isSignedIn === true && isActiveOrgReady,
+    refetchOnWindowFocus: false,
   });
 
   const handleViewPolicy = async () => {
@@ -40,10 +51,10 @@ export default function PolicyPage() {
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-8">
-        {isLoading ? (
+        {isPolicyLoading || isLoading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading…
+            Loading your policy…
           </div>
         ) : !policy ? (
           <Card>

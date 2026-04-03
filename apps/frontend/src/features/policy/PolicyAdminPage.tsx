@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  ExternalLink,
   FileText,
   Loader2,
   RefreshCw,
@@ -13,7 +14,6 @@ import {
   Upload,
   XCircle,
   Archive,
-  ChevronRight,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { usePolicyApi } from "@/api/policy";
 import type { Policy, PolicyStatus } from "@auditor/zod";
+import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 
 const POLL_MS = 10000;
 
@@ -262,11 +263,17 @@ export default function PolicyAdminPage() {
   const navigate = useNavigate();
   const { orgRole } = useAuth();
   const { user } = useUser();
-  const { listPolicies, getPolicy } = usePolicyApi();
+  const { listPolicies, getPolicy, getActivePolicyDownloadUrl } = usePolicyApi();
+  const {
+    orgId: activeOrgId,
+    isReady: isActiveOrgReady,
+    isWaitingForActivation: isWaitingForActiveOrg,
+  } = useActiveOrganizationReady();
 
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [openingActivePolicy, setOpeningActivePolicy] = useState(false);
 
   useEffect(() => {
     if (orgRole !== undefined && orgRole !== "org:admin") {
@@ -288,7 +295,10 @@ export default function PolicyAdminPage() {
     }
   }, [listPolicies]);
 
-  useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
+  useEffect(() => {
+    if (!isActiveOrgReady) return;
+    fetchPolicies();
+  }, [fetchPolicies, isActiveOrgReady, activeOrgId]);
 
   const handlePoll = useCallback(async (id: string) => {
     try {
@@ -348,6 +358,18 @@ export default function PolicyAdminPage() {
     setPolicies((prev) => [p, ...prev]);
   };
 
+  const handleViewActivePolicy = async () => {
+    setOpeningActivePolicy(true);
+    try {
+      const url = await getActivePolicyDownloadUrl();
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error("Failed to open the active policy.");
+    } finally {
+      setOpeningActivePolicy(false);
+    }
+  };
+
   const activePolicy = policies.find((p) => p.status === "active");
 
   return (
@@ -379,25 +401,50 @@ export default function PolicyAdminPage() {
       </header>
 
       <main className="mx-auto max-w-2xl space-y-8 px-4 py-8">
+        {isWaitingForActiveOrg && (
+          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading your organization policy workspace…
+          </div>
+        )}
 
         {/* Active policy callout */}
-        {activePolicy && (
+        {!isWaitingForActiveOrg && activePolicy && (
           <div className="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
             <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm truncate">{activePolicy.name}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
+                Active policy
+              </p>
+              <p className="mt-1 truncate font-semibold text-sm">{activePolicy.name}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {activePolicy.version && (
-                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                    {activePolicy.version}
+                  <span>
+                    Policy number{" "}
+                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      {activePolicy.version}
+                    </span>
                   </span>
                 )}
-                <span className="text-xs text-muted-foreground">
+                <span>
                   {activePolicy.chunkCount.toLocaleString()} chunks indexed
                 </span>
               </div>
             </div>
-            <ChevronRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={handleViewActivePolicy}
+              disabled={openingActivePolicy}
+            >
+              {openingActivePolicy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ExternalLink className="h-4 w-4" />
+              )}
+              View PDF
+            </Button>
           </div>
         )}
 

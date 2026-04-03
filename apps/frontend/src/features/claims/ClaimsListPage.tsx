@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { usePolicyApi } from "@/api/policy";
 import { useAuditApi } from "@/api/audit";
 import { useOrganizationApi } from "@/api/organization";
+import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 
 // ─── status meta ──────────────────────────────────────────────────────────────
 
@@ -371,6 +372,11 @@ export function ClaimsListPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const { getActivePolicy } = usePolicyApi();
   const { createInvitation } = useOrganizationApi();
+  const {
+    orgId: activeOrgId,
+    isReady: isActiveOrgReady,
+    isWaitingForActivation: isWaitingForActiveOrg,
+  } = useActiveOrganizationReady();
 
   // Only fire queries once Clerk has fully loaded and confirmed the user is signed in.
   // resolveToken retries up to 5× with 200ms gaps, covering the brief window after
@@ -392,9 +398,9 @@ export function ClaimsListPage() {
   });
 
   const { data: activePolicy } = useQuery({
-    queryKey: ["policy", "active"],
+    queryKey: ["policy", "active", activeOrgId ?? "no-active-org"],
     queryFn: getActivePolicy,
-    enabled: queryEnabled,
+    enabled: queryEnabled && isActiveOrgReady,
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -528,19 +534,32 @@ export function ClaimsListPage() {
       <main className="mx-auto max-w-3xl px-4 py-8">
 
         {/* Active policy banner */}
-        {activePolicy && (
+        {isWaitingForActiveOrg ? (
+          <div className="mb-6 flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Loading your organization policy…
+          </div>
+        ) : activePolicy && (
           <button
             onClick={() => navigate(policyPath)}
             className="mb-6 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-left transition-colors hover:bg-emerald-500/10"
           >
             <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
             <div className="min-w-0 flex-1">
-              <span className="truncate text-sm font-medium">{activePolicy.name}</span>
-              {activePolicy.version && (
-                <span className="ml-2 rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
-                  {activePolicy.version}
-                </span>
-              )}
+              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
+                Active policy
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-medium">{activePolicy.name}</span>
+                {activePolicy.version && (
+                  <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                    Policy number{" "}
+                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
+                      {activePolicy.version}
+                    </span>
+                  </span>
+                )}
+              </div>
             </div>
             <span className="shrink-0 text-xs text-muted-foreground">View policy →</span>
           </button>
