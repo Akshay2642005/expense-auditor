@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wait-on ../../packages/openapi/dist/index.js && vite",
     "build": "tsc && vite build",
+    "start": "serve -s dist",
     "test": "vite test",
     "preview": "vite preview",
     "lint:fix": "eslint src --fix",

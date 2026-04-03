@@ -1,0 +1,21 @@
+[phases.setup]
+nixPkgs = ['nodejs_22', 'bun']
+aptPkgs = ['git']
+
+[phases.install]
+# Ensure we are in the root for the workspace-wide install
+workDir = '/app'
+cmds = [
+    'bun install --frozen-lockfile',
+    # Note: Using 'bun x turbo' is safer than 'bun run build' for filters
+    'bun x turbo run build --filter=@auditor/openapi --filter=@auditor/zod'
+]
+
+[phases.build]
+# Navigate to the actual frontend app
+workDir = '/app/apps/frontend'
+cmds = ['bun run build']
+
+[start]
+# Absolute path to ensure it finds the build artifacts
+cmd = 'cd /app/apps/frontend && bun run start -- -p ${PORT:-3000}'
