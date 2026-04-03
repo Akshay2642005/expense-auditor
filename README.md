@@ -1,5 +1,7 @@
 # Expense Auditor
 
+AI-assisted, policy-first expense auditing for OCR-driven claim review, policy validation, and finance-team oversight.
+
 Expense Auditor is a policy-first expense compliance platform built from the "Policy-First Expense Auditor" PDF brief in this repository. The system combines receipt OCR, policy retrieval, AI-assisted auditing, and an admin review workflow so organizations can move from manual receipt review to a faster, more consistent audit loop.
 
 This monorepo contains:

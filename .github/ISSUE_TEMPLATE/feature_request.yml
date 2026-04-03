@@ -1,0 +1,76 @@
+name: Feature request
+description: Propose a new feature, workflow improvement, or product enhancement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for new functionality, workflow improvements, or roadmap work. The most helpful requests describe the problem first, then the proposed outcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user or business problem are we trying to solve?
+      placeholder: Describe the pain point or gap in the current product.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or workflow you want to add.
+      placeholder: Explain the desired behavior at a product level.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Primary area
+      options:
+        - Frontend
+        - Backend
+        - Shared contracts or schemas
+        - Auth or organization flow
+        - Policy ingestion or retrieval
+        - OCR or AI audit pipeline
+        - Admin review workflow
+        - Notifications
+        - Documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List the conditions that would make this feature complete.
+      placeholder: |
+        - Users can ...
+        - Admins can ...
+        - The system should ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: What should be included, and what should explicitly stay out of scope?
+      placeholder: Include any useful boundaries so implementation stays focused.
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References or mockups
+      description: Link related issues, screenshots, PDFs, diagrams, or example products if available.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      placeholder: Notes about rollout, risk, migration impact, or open questions.
