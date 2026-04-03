@@ -18,4 +18,4 @@ cmds = ['bun run build']
 
 [start]
 # Absolute path to ensure it finds the build artifacts
-cmd = 'cd /app/apps/frontend && bun run start -- -p ${PORT:-3000}'
+cmd = 'cd /app/apps/frontend && bun run start'
