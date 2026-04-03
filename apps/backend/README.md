@@ -1,238 +1,238 @@
-# Go expense-auditor Backend
+# Backend
 
-A production-ready Go backend service built with Echo framework, featuring clean architecture, comprehensive middleware, and modern DevOps practices.
+The backend is the system of record for claims, policies, audits, and organization-scoped authorization. It exposes the HTTP API, runs background jobs, stores claims and policy metadata, and coordinates the OCR plus audit pipeline.
 
-## Architecture Overview
+## Responsibilities
 
-This backend follows clean architecture principles with clear separation of concerns:
+- accept claim uploads
+- persist claim state transitions
+- run OCR and policy-matching jobs
+- store and retrieve active policy data
+- enforce org and role boundaries with Clerk
+- expose admin claim review endpoints
+- generate and serve OpenAPI documentation
 
+## High-Level Flow
+
+1. `POST /api/v1/claims` accepts a receipt upload plus business purpose and expense metadata.
+2. A background OCR job extracts merchant, date, amount, and currency.
+3. OCR validation checks unreadable receipts, date mismatch, and business-purpose consistency.
+4. Policy ingestion jobs chunk and embed the active policy PDF into pgvector-backed search data.
+5. Audit jobs retrieve relevant policy chunks and ask Gemini for a structured decision.
+6. Results are stored on the claim and surfaced to employees and admins.
+
+## Tech Stack
+
+- Go `1.25`
+- Echo
+- PostgreSQL + pgx + pgvector
+- Redis + Asynq
+- Clerk Go SDK
+- Gemini API
+- Google Cloud Storage
+- Zerolog + optional New Relic integration
+
+## Folder Guide
+
+```text
+apps/backend/
+|-- cmd/expense-auditor/        # main application entry point
+|-- internal/
+|   |-- cache/                  # Redis key helpers and cache helpers
+|   |-- config/                 # environment-backed configuration
+|   |-- database/               # pgx setup and migrations
+|   |-- handler/                # HTTP handlers and request binding
+|   |-- lib/
+|   |   |-- gemini/             # OCR, embeddings, audit, PDF extraction
+|   |   |-- job/                # Asynq job handlers
+|   |   `-- email/              # email helpers
+|   |-- middleware/             # auth, context enrichment, security
+|   |-- model/                  # domain types
+|   |-- repository/             # database access
+|   |-- router/                 # route registration
+|   |-- server/                 # process wiring
+|   |-- service/                # business logic
+|   `-- testing/                # testcontainers-backed integration helpers
+|-- static/                     # generated OpenAPI JSON
+|-- compose.yaml                # local Postgres + Redis
+|-- Dockerfile
+`-- Taskfile.yml
 ```
-backend/
-├── cmd/expense-auditor/        # Application entry point
-├── internal/                  # Private application code
-│   ├── config/               # Configuration management
-│   ├── database/             # Database connections and migrations
-│   ├── handler/              # HTTP request handlers
-│   ├── service/              # Business logic layer
-│   ├── repository/           # Data access layer
-│   ├── model/                # Domain models
-│   ├── middleware/           # HTTP middleware
-│   ├── lib/                  # Shared libraries
-│   └── validation/           # Request validation
-├── static/                   # Static files (OpenAPI spec)
-├── templates/                # Email templates
-└── Taskfile.yml              # Task automation
-```
 
-## Features
+## API Surface
 
-### Core Framework
-- **Echo v4**: High-performance, minimalist web framework
-- **Clean Architecture**: Handlers → Services → Repositories → Models
-- **Dependency Injection**: Constructor-based DI for testability
+### System
 
-### Database
-- **PostgreSQL**: Primary database with pgx/v5 driver
-- **Migration System**: Tern for schema versioning
-- **Connection Pooling**: Optimized for production workloads
-- **Transaction Support**: ACID compliance for critical operations
+- `GET /status`
+- `GET /docs`
+- `GET /static/openapi.json`
 
-### Authentication & Security
-- **Clerk Integration**: Modern authentication service
-- **JWT Validation**: Secure token verification
-- **Role-Based Access**: Configurable permission system
-- **Rate Limiting**: 20 requests/second per IP
-- **Security Headers**: XSS, CSRF, and clickjacking protection
+### Claims
 
-### Observability
-- **New Relic APM**: Application performance monitoring
-- **Structured Logging**: JSON logs with Zerolog
-- **Request Tracing**: Distributed tracing support
-- **Health Checks**: Readiness and liveness endpoints
-- **Custom Metrics**: Business-specific monitoring
+- `POST /api/v1/claims`
+- `GET /api/v1/claims`
+- `GET /api/v1/claims/:id`
+- `GET /api/v1/claims/:id/receipt`
+- `GET /api/v1/claims/:id/audit`
 
-### Background Jobs
-- **Asynq**: Redis-based distributed task queue
-- **Priority Queues**: Critical, default, and low priority
-- **Job Scheduling**: Cron-like task scheduling
-- **Retry Logic**: Exponential backoff for failed jobs
-- **Job Monitoring**: Real-time job status tracking
+### Admin Claim Review
 
-### Email Service
-- **Resend Integration**: Reliable email delivery
-- **HTML Templates**: Beautiful transactional emails
-- **Preview Mode**: Test emails in development
-- **Batch Sending**: Efficient bulk operations
+- `GET /api/v1/admin/claims`
+- `POST /api/v1/admin/claims/:id/recompute-policy`
 
-### API Documentation
-- **OpenAPI 3.0**: Complete API specification
-- **Swagger UI**: Interactive API explorer
-- **Auto-generation**: Code-first approach
+### Policy
 
-## Getting Started
+- `GET /api/v1/policy/active`
+- `GET /api/v1/policy/active/download`
+- `POST /api/v1/admin/policy`
+- `GET /api/v1/admin/policy`
+- `GET /api/v1/admin/policy/:id`
+
+### Organization
+
+- `POST /api/v1/admin/organization/invitations`
+
+## Local Setup
 
 ### Prerequisites
-- Go 1.24+
-- PostgreSQL 16+
-- Redis 8+
-- Task (taskfile.dev)
 
-### Installation
+- Go `1.25+`
+- Docker
+- `task`
+- `tern`
 
-1. Install dependencies:
+### Start Local Services
+
 ```bash
-go mod download
+cd C:\dev\Projects\expense-auditor\apps\backend
+docker compose up -d
 ```
 
-2. Set up environment:
+Local compose ports:
+
+- Postgres: `15432`
+- Redis: `16316`
+
+### Configure Environment
+
+Copy:
+
 ```bash
-cp .env.example .env
-# Configure your environment variables
+Copy-Item .env.sample .env
 ```
 
-3. Run migrations:
+Minimum values to verify:
+
+```dotenv
+EXPAU_PRIMARY.ENV="local"
+EXPAU_SERVER.PORT="8080"
+EXPAU_SERVER.CORS_ALLOWED_ORIGINS="http://localhost:5173"
+
+EXPAU_DATABASE.HOST="localhost"
+EXPAU_DATABASE.PORT="15432"
+EXPAU_DATABASE.USER="postgres"
+EXPAU_DATABASE.PASSWORD="postgres"
+EXPAU_DATABASE.NAME="auditor"
+EXPAU_DATABASE.SSL_MODE="disable"
+
+EXPAU_REDIS.ADDRESS="localhost:16316"
+
+EXPAU_AUTH.SECRET_KEY="your-clerk-secret-key"
+EXPAU_INTEGRATION.RESEND_API_KEY="your-resend-api-key"
+
+EXPAU_AI.GEMINI_API_KEY="your-gemini-api-key"
+EXPAU_AI.DATE_MISMATCH_THRESHOLD="7"
+
+EXPAU_STORAGE.GCS_BUCKET_NAME="your-gcs-bucket"
+EXPAU_STORAGE.GCS_PROJECT_ID="your-gcp-project"
+EXPAU_STORAGE.GCS_CREDENTIALS="service-account-json-or-path"
+EXPAU_STORAGE.MAX_FILE_SIZE_MB="10"
+```
+
+Notes:
+
+- New Relic is optional locally.
+- GCS is required for real upload flows.
+- Gemini is required for OCR, policy extraction, embeddings, and auditing.
+
+### Run Migrations
+
 ```bash
 task migrations:up
 ```
 
-4. Start the server:
+### Run The API
+
 ```bash
 task run
 ```
 
-## Configuration
+The API starts on `http://localhost:8080`.
 
-Configuration is managed through environment variables with the `EPAU_` prefix:
-
-## Development
-
-### Available Tasks
+## Useful Commands
 
 ```bash
-task help                    # Show all available tasks
-task run                     # Run the application
-task test                    # Run tests
-task migrations:new name=X   # Create new migration
-task migrations:up           # Apply migrations
-task migrations:down         # Rollback last migration
-task tidy                    # Format and tidy dependencies
+task help
+task run
+task migrations:new name=your_migration
+task migrations:up
+task tidy
+go test ./...
 ```
 
-### Project Structure
+## Testing
 
-#### Handlers (`internal/handler/`)
-HTTP request handlers that:
-- Parse and validate requests
-- Call appropriate services
-- Format responses
-- Handle HTTP-specific concerns
+### Fast Test Pass
 
-#### Services (`internal/service/`)
-Business logic layer that:
-- Implements use cases
-- Orchestrates operations
-- Enforces business rules
-- Handles transactions
-
-#### Repositories (`internal/repository/`)
-Data access layer that:
-- Encapsulates database queries
-- Provides data mapping
-- Handles database-specific logic
-- Supports multiple data sources
-
-#### Models (`internal/model/`)
-Domain entities that:
-- Define core business objects
-- Include validation rules
-- Remain database-agnostic
-
-#### Middleware (`internal/middleware/`)
-Cross-cutting concerns:
-- Authentication/Authorization
-- Request logging
-- Error handling
-- Rate limiting
-- CORS
-- Security headers
-
-### Testing
-
-#### Unit Tests
 ```bash
 go test ./...
 ```
 
-## Logging
+### Integration-Style Database Tests
 
-Structured logging with Zerolog:
+Use the helpers in `internal/testing` when you need a real migrated Postgres instance in tests:
 
-```go
-log.Info().
-    Str("user_id", userID).
-    Str("action", "login").
-    Msg("User logged in successfully")
-```
+- `SetupTestDB(t)`
+- `SetupTest(t)`
+- `WithRollbackTransaction(...)`
 
-Log levels:
-- `debug`: Detailed debugging information
-- `info`: General informational messages
-- `warn`: Warning messages
-- `error`: Error messages
-- `fatal`: Fatal errors that cause shutdown
+These helpers use Testcontainers, so Docker must be running.
 
-### Production Checklist
+## Implementation Notes
 
-- [ ] Set production environment variables
-- [ ] Enable SSL/TLS
-- [ ] Configure production database
-- [ ] Set up monitoring alerts
-- [ ] Configure log aggregation
-- [ ] Enable rate limiting
-- [ ] Set up backup strategy
-- [ ] Configure auto-scaling
-- [ ] Implement graceful shutdown
-- [ ] Set up CI/CD pipeline
+### Claims And Audit Pipeline
 
-## Performance Optimization
+- claim creation is synchronous at the HTTP layer and asynchronous for OCR / audit
+- OCR and audit jobs live under `internal/lib/job`
+- AI wrappers live under `internal/lib/gemini`
+- cached claim and queue reads live under `internal/cache`
 
-### Database
-- Connection pooling configured
-- Prepared statements for frequent queries
-- Indexes on commonly queried fields
-- Query optimization with EXPLAIN ANALYZE
+### Admin Review Queue
 
-### Caching
-- Redis for session storage
-- In-memory caching for hot data
-- HTTP caching headers
+- admin access is enforced by route middleware and service-level authorization
+- the initial authorized queue comes from the backend
+- current UI filtering is performed in the frontend after the initial fetch
+- backend filtered query support still exists for future pagination / larger datasets
 
-### Concurrency
-- Goroutine pools for parallel processing
-- Context-based cancellation
-- Proper mutex usage
+### OpenAPI
 
-## Security Best Practices
+The generated OpenAPI JSON is served from `apps/backend/static/openapi.json`. The source of truth for contract generation lives in `packages/openapi`.
 
-1. **Input Validation**: All inputs validated and sanitized
-2. **SQL Injection**: Parameterized queries only
-3. **XSS Protection**: Output encoding and CSP headers
-4. **CSRF Protection**: Token-based protection
-5. **Rate Limiting**: Per-IP and per-user limits
-6. **Secrets Management**: Environment variables, never in code
-7. **HTTPS Only**: Enforce TLS in production
-8. **Dependency Scanning**: Regular vulnerability checks
+## Current Gaps Relative To The PDF Brief
 
-## Contributing
+- no complete auditor override / dispute workflow yet
+- no dedicated risk score model yet
+- no full claim notification workflow yet
+- no final side-by-side audit workstation layout yet
 
-1. Follow Go best practices and idioms
-2. Write tests for new features
-3. Update documentation
-4. Run linters before committing
-5. Keep commits atomic and well-described
+## Deployment Notes
 
-## License
+For production, plan for:
 
-See the parent project's LICENSE file.
-
-
+- managed Postgres with pgvector enabled
+- managed Redis
+- Clerk production keys
+- a production GCS bucket and service account
+- Gemini API quotas and monitoring
+- log aggregation and alerting
+- a deployment workflow that regenerates OpenAPI on contract changes
