@@ -46,6 +46,7 @@ func NewClaimService(s *server.Server, repos *repository.Repositories) *ClaimSer
 type SubmitClaimInput struct {
 	UserID          string
 	OrgID           string
+	UserRole        string
 	BusinessPurpose string
 	ClaimedDate     time.Time
 	ExpenseCategory model.ExpenseCategory
@@ -63,6 +64,27 @@ type SubmitClaimOutput struct {
 // SubmitClaim validates, stores the receipt, persists the claim, and enqueues OCR.
 func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*SubmitClaimOutput, error) {
 	log := s.server.Logger
+
+	if in.OrgID == "" || in.UserRole == "" {
+		return nil, errs.NewForbiddenError(
+			"an active organization session is required to submit expense claims",
+			true,
+		)
+	}
+
+	if in.UserRole == "org:admin" {
+		return nil, errs.NewForbiddenError(
+			"admin accounts cannot submit expense claims; use a member account for reimbursements",
+			true,
+		)
+	}
+
+	if in.UserRole != "org:member" {
+		return nil, errs.NewForbiddenError(
+			"only member accounts can submit expense claims",
+			true,
+		)
+	}
 
 	// --- MIME type check ---
 	ext, ok := allowedMIMETypes[in.FileHeader.Header.Get("Content-Type")]
@@ -144,6 +166,7 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 	claim, err := s.repos.Claim.CreateClaim(ctx, &model.Claim{
 		UserID:          in.UserID,
 		OrgID:           in.OrgID,
+		SubmittedByRole: in.UserRole,
 		ReceiptFileID:   rf.ID,
 		BusinessPurpose: in.BusinessPurpose,
 		ClaimedDate:     in.ClaimedDate,
@@ -153,8 +176,14 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 		return nil, fmt.Errorf("failed to save claim: %w", err)
 	}
 
-	// Invalidate the user's claim list so the new claim appears immediately
-	_ = cache.Del(ctx, s.server.Cache, cache.KeyClaimList(in.UserID))
+	// Invalidate the submitter list and any admin review queues for this org.
+	keys := []string{cache.KeyClaimList(in.UserID)}
+	if in.OrgID != "" {
+		if err := cache.InvalidatePattern(ctx, s.server.Cache, cache.KeyAdminClaimListPattern(in.OrgID)); err != nil {
+			s.server.Logger.Warn().Err(err).Str("org_id", in.OrgID).Msg("failed to invalidate admin claim list cache")
+		}
+	}
+	_ = cache.Del(ctx, s.server.Cache, keys...)
 
 	// --- Enqueue OCR job ---
 	ocrTask, err := job.NewOCRReceiptTask(claim.ID, gcsPath, mimeType, in.ClaimedDate)
@@ -180,12 +209,18 @@ func (s *ClaimService) SubmitClaim(ctx context.Context, in *SubmitClaimInput) (*
 	}, nil
 }
 
-// GetClaim returns a claim by ID, enforcing ownership. Reads from cache first.
-func (s *ClaimService) GetClaim(ctx context.Context, claimID uuid.UUID, userID string) (*model.Claim, error) {
+// GetClaim returns a claim by ID, enforcing role-aware access. Reads from cache first.
+func (s *ClaimService) GetClaim(
+	ctx context.Context,
+	claimID uuid.UUID,
+	userID string,
+	orgID string,
+	userRole string,
+) (*model.Claim, error) {
 	key := cache.KeyClaim(claimID.String())
 	if cached, ok, _ := cache.Get[model.Claim](ctx, s.server.Cache, key); ok {
 		s.server.Logger.Debug().Str("key", key).Msg("cache hit: claim")
-		if cached.UserID != userID {
+		if !canViewClaim(cached, userID, orgID, userRole) {
 			return nil, errs.NewForbiddenError("access denied", false)
 		}
 		return cached, nil
@@ -198,7 +233,7 @@ func (s *ClaimService) GetClaim(ctx context.Context, claimID uuid.UUID, userID s
 		}
 		return nil, fmt.Errorf("failed to get claim: %w", err)
 	}
-	if claim.UserID != userID {
+	if !canViewClaim(claim, userID, orgID, userRole) {
 		return nil, errs.NewForbiddenError("access denied", false)
 	}
 
@@ -261,6 +296,25 @@ func (s *ClaimService) GetUserClaims(ctx context.Context, userID string) ([]mode
 	return claims, nil
 }
 
+// GetAdminReviewClaims returns org claims that were submitted by regular members.
+// Claims owned by the current admin are excluded so legacy self-submissions
+// do not appear in the review queue.
+func (s *ClaimService) GetAdminReviewClaims(ctx context.Context, orgID string, adminUserID string) ([]model.Claim, error) {
+	key := cache.KeyAdminClaimList(orgID, adminUserID)
+	if cached, ok, _ := cache.Get[[]model.Claim](ctx, s.server.Cache, key); ok {
+		s.server.Logger.Debug().Str("key", key).Msg("cache hit: admin claim list")
+		return *cached, nil
+	}
+
+	claims, err := s.repos.Claim.GetClaimsForAdminReview(ctx, orgID, adminUserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list admin review claims: %w", err)
+	}
+
+	_ = cache.Set(ctx, s.server.Cache, key, claims, cache.TTLClaimList)
+	return claims, nil
+}
+
 // RecomputePolicyMatch re-runs policy retrieval + cap check for a claim.
 // Admin-only route should call this; no ownership check here.
 func (s *ClaimService) RecomputePolicyMatch(ctx context.Context, claimID uuid.UUID) (*model.Claim, error) {
@@ -286,8 +340,14 @@ func (s *ClaimService) RecomputePolicyMatch(ctx context.Context, claimID uuid.UU
 }
 
 // StreamReceipt downloads a receipt from GCS and streams it back.
-// Enforces ownership before serving the file.
-func (s *ClaimService) StreamReceipt(ctx context.Context, claimID uuid.UUID, userID string) ([]byte, string, error) {
+// Enforces role-aware access before serving the file.
+func (s *ClaimService) StreamReceipt(
+	ctx context.Context,
+	claimID uuid.UUID,
+	userID string,
+	orgID string,
+	userRole string,
+) ([]byte, string, error) {
 	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID) // intentionally bypass cache — binary blob
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -296,7 +356,7 @@ func (s *ClaimService) StreamReceipt(ctx context.Context, claimID uuid.UUID, use
 		return nil, "", fmt.Errorf("stream receipt: get claim: %w", err)
 	}
 
-	if claim.UserID != userID {
+	if !canViewClaim(claim, userID, orgID, userRole) {
 		return nil, "", errs.NewForbiddenError("access denied", false)
 	}
 
@@ -385,11 +445,16 @@ func (s *ClaimService) reconcilePolicyStatus(ctx context.Context, claim *model.C
 		return fmt.Errorf("update claim status: %w", err)
 	}
 	claim.Status = nextStatus
+	s.invalidateClaimCaches(ctx, claim.ID)
 	return nil
 }
 
 func (s *ClaimService) SetClaimOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error {
-	return s.repos.Claim.SetOrgID(ctx, claimID, orgID)
+	if err := s.repos.Claim.SetOrgID(ctx, claimID, orgID); err != nil {
+		return err
+	}
+	s.invalidateClaimCaches(ctx, claimID)
+	return nil
 }
 
 func (s *ClaimService) SetClaimJobStatus(ctx context.Context, claimID uuid.UUID, status model.ClaimStatus) error {
@@ -413,6 +478,11 @@ func (s *ClaimService) invalidateClaimCaches(ctx context.Context, claimID uuid.U
 	keys := []string{cache.KeyClaim(claimID.String())}
 	if claim, err := s.repos.Claim.GetClaimByID(ctx, claimID); err == nil {
 		keys = append(keys, cache.KeyClaimList(claim.UserID))
+		if claim.OrgID != "" {
+			if err := cache.InvalidatePattern(ctx, s.server.Cache, cache.KeyAdminClaimListPattern(claim.OrgID)); err != nil {
+				s.server.Logger.Warn().Err(err).Str("org_id", claim.OrgID).Msg("failed to invalidate admin claim list cache")
+			}
+		}
 	}
 	_ = cache.Del(ctx, s.server.Cache, keys...)
 }
@@ -455,16 +525,7 @@ func (s *ClaimService) SaveClaimOCRResult(
 	); err != nil {
 		return err
 	}
-	// Invalidate both the individual claim and the user's list (amount/status changed)
-	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
-	if err == nil {
-		_ = cache.Del(ctx, s.server.Cache,
-			cache.KeyClaim(claimID.String()),
-			cache.KeyClaimList(claim.UserID),
-		)
-	} else {
-		_ = cache.Del(ctx, s.server.Cache, cache.KeyClaim(claimID.String()))
-	}
+	s.invalidateClaimCaches(ctx, claimID)
 	return nil
 }
 
@@ -486,14 +547,16 @@ func (s *ClaimService) SaveClaimPolicyMatch(
 	if err := s.repos.Claim.SavePolicyMatch(ctx, claimID, policyID, raw, status); err != nil {
 		return err
 	}
-	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
-	if err == nil {
-		_ = cache.Del(ctx, s.server.Cache,
-			cache.KeyClaim(claimID.String()),
-			cache.KeyClaimList(claim.UserID),
-		)
-	} else {
-		_ = cache.Del(ctx, s.server.Cache, cache.KeyClaim(claimID.String()))
-	}
+	s.invalidateClaimCaches(ctx, claimID)
 	return nil
+}
+
+func canViewClaim(claim *model.Claim, userID string, orgID string, userRole string) bool {
+	if userRole == "org:admin" {
+		return orgID != "" &&
+			claim.OrgID == orgID &&
+			claim.SubmittedByRole == "org:member" &&
+			claim.UserID != userID
+	}
+	return claim.UserID == userID
 }

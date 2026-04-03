@@ -1,24 +1,35 @@
-import { useUser } from "@clerk/clerk-react";
-import { useMutation } from "@tanstack/react-query";
-import {
-  Upload, FileText, Calendar, Tag,
-  AlignLeft, CheckCircle, Clipboard,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useClaimsApi } from "@/api/claims";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useClaimsApi } from "@/api/claims";
+import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 import { cn } from "@/lib/utils";
+import { useAuth, useUser } from "@clerk/clerk-react";
+import { useMutation } from "@tanstack/react-query";
+import {
+  Upload,
+  FileText,
+  Calendar,
+  Tag,
+  AlignLeft,
+  CheckCircle,
+  Clipboard,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 type ExpenseCategory = "meals" | "transport" | "lodging" | "other";
 
@@ -43,8 +54,11 @@ function validateFile(file: File): string | null {
 
 export function SubmitClaimPage() {
   const { user } = useUser();
+  const { orgRole, isLoaded: authLoaded } = useAuth();
   const navigate = useNavigate();
   const { submitClaim } = useClaimsApi();
+  const { orgId, isWaitingForActivation: isWaitingForActiveOrg } =
+    useActiveOrganizationReady();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -78,14 +92,19 @@ export function SubmitClaimPage() {
     },
     onError: (err: unknown) => {
       const msg =
-        err instanceof Error ? err.message : "Something went wrong. Please try again.";
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.";
       toast.error("Submission failed", { description: msg });
     },
   });
 
   const applyFile = (file: File) => {
     const err = validateFile(file);
-    if (err) { toast.error("Invalid file", { description: err }); return; }
+    if (err) {
+      toast.error("Invalid file", { description: err });
+      return;
+    }
     setSelectedFile(file);
   };
 
@@ -104,14 +123,20 @@ export function SubmitClaimPage() {
       );
       if (imageItem) {
         const file = imageItem.getAsFile();
-        if (file) { applyFile(file); flashPasteHint(); }
+        if (file) {
+          applyFile(file);
+          flashPasteHint();
+        }
         return;
       }
 
       const fileItem = items.find((it) => it.kind === "file");
       if (fileItem) {
         const file = fileItem.getAsFile();
-        if (file) { applyFile(file); flashPasteHint(); }
+        if (file) {
+          applyFile(file);
+          flashPasteHint();
+        }
       }
     };
 
@@ -127,28 +152,30 @@ export function SubmitClaimPage() {
         const imgType = item.types.find((t) => t.startsWith("image/"));
         if (imgType) {
           const blob = await item.getType(imgType);
-          const file = new File(
-            [blob],
-            `clipboard.${imgType.split("/")[1]}`,
-            { type: imgType },
-          );
+          const file = new File([blob], `clipboard.${imgType.split("/")[1]}`, {
+            type: imgType,
+          });
           applyFile(file);
           flashPasteHint();
           return;
         }
       }
       toast.info("No image in clipboard", {
-        description: "Copy an image first, then click this button or press Ctrl+V.",
+        description:
+          "Copy an image first, then click this button or press Ctrl+V.",
       });
     } catch {
-      toast.info("Press Ctrl+V (or ⌘V) anywhere on this page to paste your receipt.");
+      toast.info(
+        "Press Ctrl+V (or ⌘V) anywhere on this page to paste your receipt.",
+      );
     }
   };
 
   const onSubmit = (values: FormValues) => {
     if (!selectedFile) {
       toast.error("Receipt required", {
-        description: "Attach a receipt — drop a file, browse, or paste from clipboard.",
+        description:
+          "Attach a receipt — drop a file, browse, or paste from clipboard.",
       });
       return;
     }
@@ -157,18 +184,84 @@ export function SubmitClaimPage() {
 
   const today = new Date().toISOString().split("T")[0];
 
+  if (!authLoaded || isWaitingForActiveOrg) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (orgRole === "org:admin") {
+    return (
+      <div className="min-h-screen bg-background p-4 sm:p-8">
+        <div className="mx-auto max-w-xl space-y-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+            ← Back to Review Queue
+          </Button>
+
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+              <div className="space-y-2">
+                <p className="font-semibold">
+                  Claim submission is disabled for admins
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Admin accounts can review and audit member claims, but they
+                  cannot upload reimbursement claims themselves.
+                </p>
+              </div>
+              <Button onClick={() => navigate("/")}>Go to Claims Review</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!orgId || orgRole !== "org:member") {
+    return (
+      <div className="min-h-screen bg-background p-4 sm:p-8">
+        <div className="mx-auto max-w-xl space-y-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+            ← Back
+          </Button>
+
+          <Card>
+            <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+              <AlertTriangle className="h-10 w-10 text-amber-500" />
+              <div className="space-y-2">
+                <p className="font-semibold">
+                  Join an organization to submit claims
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Expense submission requires an active organization membership
+                  so the claim can be audited against the correct policy.
+                </p>
+              </div>
+              <Button onClick={() => navigate("/")}>Back to Home</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Submit Expense</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Submit Expense
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Hi {user?.firstName ?? "there"} — attach your receipt and describe the expense.
+            Hi {user?.firstName ?? "there"} — attach your receipt and describe
+            the expense.
           </p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-
           {/* Receipt upload */}
           <Card>
             <CardHeader>
@@ -178,7 +271,6 @@ export function SubmitClaimPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-
               {/* Drop zone */}
               <div
                 className={cn(
@@ -192,7 +284,10 @@ export function SubmitClaimPage() {
                         : "border-muted-foreground/25 hover:border-primary/50",
                 )}
                 onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -204,14 +299,17 @@ export function SubmitClaimPage() {
                 {pasteHint ? (
                   <div className="flex flex-col items-center gap-2 text-center">
                     <Clipboard className="h-8 w-8 animate-bounce text-primary" />
-                    <p className="text-sm font-medium text-primary">Pasted from clipboard!</p>
+                    <p className="text-sm font-medium text-primary">
+                      Pasted from clipboard!
+                    </p>
                   </div>
                 ) : selectedFile ? (
                   <div className="flex flex-col items-center gap-2 text-center">
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <p className="text-sm font-medium">{selectedFile.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {(selectedFile.size / 1024).toFixed(0)} KB — click to replace
+                      {(selectedFile.size / 1024).toFixed(0)} KB — click to
+                      replace
                     </p>
                   </div>
                 ) : (
@@ -262,7 +360,6 @@ export function SubmitClaimPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-
               <div className="space-y-1.5">
                 <Label htmlFor="businessPurpose">Business Purpose</Label>
                 <Textarea
@@ -271,8 +368,14 @@ export function SubmitClaimPage() {
                   className="min-h-[80px] resize-none"
                   {...register("businessPurpose", {
                     required: "Business purpose is required",
-                    minLength: { value: 10, message: "Please provide at least 10 characters" },
-                    maxLength: { value: 500, message: "Must be 500 characters or fewer" },
+                    minLength: {
+                      value: 10,
+                      message: "Please provide at least 10 characters",
+                    },
+                    maxLength: {
+                      value: 500,
+                      message: "Must be 500 characters or fewer",
+                    },
                   })}
                 />
                 {errors.businessPurpose && (
@@ -284,7 +387,10 @@ export function SubmitClaimPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="claimedDate" className="flex items-center gap-1.5">
+                  <Label
+                    htmlFor="claimedDate"
+                    className="flex items-center gap-1.5"
+                  >
                     <Calendar className="h-3.5 w-3.5" />
                     Expense Date
                   </Label>
@@ -313,8 +419,9 @@ export function SubmitClaimPage() {
                     {...register("expenseCategory", {
                       required: "Please select a category",
                       validate: (v) =>
-                        ["meals", "transport", "lodging", "other"].includes(v) ||
-                        "Please select a valid category",
+                        ["meals", "transport", "lodging", "other"].includes(
+                          v,
+                        ) || "Please select a valid category",
                     })}
                   />
                   <Select

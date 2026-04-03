@@ -33,7 +33,13 @@ func (h *AuditHandler) GetClaimAudit(c echo.Context, req *model.GetClaimAuditReq
 	if err != nil {
 		return nil, errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
 	}
-	return h.service.GetClaimAudit(c.Request().Context(), claimID, userID)
+	return h.service.GetClaimAudit(
+		c.Request().Context(),
+		claimID,
+		userID,
+		middleware.GetOrgID(c),
+		middleware.GetUserRole(c),
+	)
 }
 
 func (h *AuditHandler) GetClaimAuditDirect(c echo.Context) error {
@@ -45,7 +51,13 @@ func (h *AuditHandler) GetClaimAuditDirect(c echo.Context) error {
 	if err != nil {
 		return errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
 	}
-	result, err := h.service.GetClaimAudit(c.Request().Context(), claimID, userID)
+	result, err := h.service.GetClaimAudit(
+		c.Request().Context(),
+		claimID,
+		userID,
+		middleware.GetOrgID(c),
+		middleware.GetUserRole(c),
+	)
 	if err != nil {
 		return err
 	}

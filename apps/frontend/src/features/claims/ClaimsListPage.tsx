@@ -1,23 +1,7 @@
-import { useAuth, useClerk, useOrganization, useUser } from "@clerk/clerk-react";
-import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import axios from "axios";
-import {
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  XCircle,
-  Plus,
-  RefreshCw,
-  Receipt,
-  LogOut,
-  User,
-  Users,
-  ShieldCheck,
-  ChevronRight,
-} from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useAuditApi } from "@/api/audit";
+import { useOrganizationApi } from "@/api/organization";
+import { usePolicyApi } from "@/api/policy";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,14 +23,43 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { API_URL } from "@/config/env";
-import type { AuditResponse, ClaimResponse } from "@auditor/zod";
-import { cn } from "@/lib/utils";
-import { usePolicyApi } from "@/api/policy";
-import { useAuditApi } from "@/api/audit";
-import { useOrganizationApi } from "@/api/organization";
 import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
+import {
+  formatOrganizationMemberLabel,
+  useOrganizationMemberDirectory,
+} from "@/hooks/useOrganizationMemberDirectory";
+import { cn } from "@/lib/utils";
+import type { AuditResponse, ClaimResponse } from "@auditor/zod";
+import {
+  useAuth,
+  useClerk,
+  useOrganization,
+  useUser,
+} from "@clerk/clerk-react";
+import {
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
+import axios from "axios";
+import {
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
+  Plus,
+  RefreshCw,
+  Receipt,
+  LogOut,
+  User,
+  Users,
+  ShieldCheck,
+  ChevronRight,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 // ─── status meta ──────────────────────────────────────────────────────────────
 
@@ -99,21 +112,29 @@ function initials(first?: string | null, last?: string | null) {
 }
 
 async function fetchClaims(token: string): Promise<ClaimResponse[]> {
-  const { data } = await axios.get<ClaimResponse[]>(`${API_URL}/api/v1/claims`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const { data } = await axios.get<ClaimResponse[]>(
+    `${API_URL}/api/v1/claims`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   return data;
 }
 
 async function fetchClaim(id: string, token: string): Promise<ClaimResponse> {
-  const { data } = await axios.get<ClaimResponse>(`${API_URL}/api/v1/claims/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const { data } = await axios.get<ClaimResponse>(
+    `${API_URL}/api/v1/claims/${id}`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
   return data;
 }
 
 /** Resolves a non-null Clerk token. Only called when authLoaded=true so retries are short. */
-async function resolveToken(getToken: () => Promise<string | null>): Promise<string> {
+async function resolveToken(
+  getToken: () => Promise<string | null>,
+): Promise<string> {
   for (let i = 0; i < 5; i++) {
     const t = await getToken();
     if (t) return t;
@@ -129,9 +150,11 @@ const HOVER_DELAY_MS = 600;
 function ClaimPreview({
   claim,
   anchorRect,
+  uploaderLabel,
 }: {
   claim: ClaimResponse;
   anchorRect: DOMRect;
+  uploaderLabel?: string;
 }) {
   const { getToken } = useAuth();
   const { getAudit } = useAuditApi();
@@ -167,9 +190,10 @@ function ClaimPreview({
   const gap = 8;
 
   const spaceRight = viewportW - anchorRect.right - gap;
-  const left = spaceRight >= previewW
-    ? anchorRect.right + gap
-    : anchorRect.left - previewW - gap;
+  const left =
+    spaceRight >= previewW
+      ? anchorRect.right + gap
+      : anchorRect.left - previewW - gap;
 
   // Align top of popover with top of row, clamped so it doesn't overflow viewport bottom
   const top = Math.min(anchorRect.top, viewportH - previewH - gap);
@@ -203,11 +227,21 @@ function ClaimPreview({
           <span className="text-muted-foreground">Category</span>
           <span className="capitalize font-medium">{d.expenseCategory}</span>
         </div>
+        {uploaderLabel && (
+          <div className="flex justify-between gap-3">
+            <span className="text-muted-foreground">Uploaded by</span>
+            <span className="truncate text-right font-medium">
+              {uploaderLabel}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Date</span>
           <span className="font-medium">
             {new Date(d.claimedDate).toLocaleDateString(undefined, {
-              year: "numeric", month: "short", day: "numeric",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
             })}
           </span>
         </div>
@@ -222,7 +256,12 @@ function ClaimPreview({
           <div className="mt-2 rounded-lg border bg-muted/50 p-2.5 space-y-1">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">AI Decision</span>
-              <span className={cn("font-semibold capitalize", auditDecisionColor[audit.decision])}>
+              <span
+                className={cn(
+                  "font-semibold capitalize",
+                  auditDecisionColor[audit.decision],
+                )}
+              >
                 {audit.decision}
               </span>
             </div>
@@ -245,7 +284,9 @@ function ClaimPreview({
       </div>
 
       <div className="border-t px-4 py-2">
-        <p className="text-[11px] text-muted-foreground">Click to view full details</p>
+        <p className="text-[11px] text-muted-foreground">
+          Click to view full details
+        </p>
       </div>
     </div>
   );
@@ -253,7 +294,17 @@ function ClaimPreview({
 
 // ─── Claim row ────────────────────────────────────────────────────────────────
 
-function ClaimRow({ claim, onClick }: { claim: ClaimResponse; onClick: () => void }) {
+function ClaimRow({
+  claim,
+  onClick,
+  isAdminView,
+  uploaderLabel,
+}: {
+  claim: ClaimResponse;
+  onClick: () => void;
+  isAdminView: boolean;
+  uploaderLabel?: string;
+}) {
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
   const { getAudit } = useAuditApi();
@@ -300,7 +351,12 @@ function ClaimRow({ claim, onClick }: { claim: ClaimResponse; onClick: () => voi
     setPreview(null);
   };
 
-  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    },
+    [],
+  );
 
   return (
     <>
@@ -314,20 +370,34 @@ function ClaimRow({ claim, onClick }: { claim: ClaimResponse; onClick: () => voi
         {/* Status dot */}
         <div className={cn("h-2 w-2 shrink-0 rounded-full", dotColor)} />
 
-        {/* Merchant + category */}
+        {/* Claim summary */}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
             {claim.merchantName ?? claim.businessPurpose ?? "—"}
           </p>
-          <p className="truncate text-xs capitalize text-muted-foreground">
-            {claim.expenseCategory}
+          <p
+            className={cn(
+              "truncate text-xs text-muted-foreground",
+              !isAdminView && "capitalize",
+            )}
+          >
+            {isAdminView
+              ? `Uploaded by ${uploaderLabel ?? claim.userId}`
+              : claim.expenseCategory}
           </p>
+          {isAdminView && (
+            <p className="truncate text-[11px] uppercase tracking-wide text-muted-foreground/60">
+              {claim.expenseCategory}
+            </p>
+          )}
         </div>
 
         {/* Date */}
         <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
           {new Date(claim.claimedDate).toLocaleDateString(undefined, {
-            month: "short", day: "numeric", year: "numeric",
+            month: "short",
+            day: "numeric",
+            year: "numeric",
           })}
         </span>
 
@@ -343,7 +413,10 @@ function ClaimRow({ claim, onClick }: { claim: ClaimResponse; onClick: () => voi
         {/* Status badge */}
         <Badge
           variant="outline"
-          className={cn("hidden shrink-0 text-[11px] capitalize sm:flex", textColor)}
+          className={cn(
+            "hidden shrink-0 text-[11px] capitalize sm:flex",
+            textColor,
+          )}
         >
           <StatusIcon className="mr-1 h-3 w-3" />
           {claim.status.replace(/_/g, " ")}
@@ -353,7 +426,13 @@ function ClaimRow({ claim, onClick }: { claim: ClaimResponse; onClick: () => voi
       </div>
 
       {preview && (
-        <ClaimPreview claim={claim} anchorRect={preview.rect} />
+        <ClaimPreview
+          claim={claim}
+          anchorRect={preview.rect}
+          uploaderLabel={
+            isAdminView ? (uploaderLabel ?? claim.userId) : undefined
+          }
+        />
       )}
     </>
   );
@@ -377,19 +456,26 @@ export function ClaimsListPage() {
     isReady: isActiveOrgReady,
     isWaitingForActivation: isWaitingForActiveOrg,
   } = useActiveOrganizationReady();
+  const isAdminView = orgRole === "org:admin";
+  const { memberDirectory } = useOrganizationMemberDirectory(isAdminView);
 
   // Only fire queries once Clerk has fully loaded and confirmed the user is signed in.
   // resolveToken retries up to 5× with 200ms gaps, covering the brief window after
   // refresh where isLoaded=true but the JWT isn't minted yet.
   const queryEnabled = authLoaded && isSignedIn === true;
+  const claimsQueryEnabled = queryEnabled && !isWaitingForActiveOrg;
 
-  const { data: claims, isLoading, isFetching } = useQuery({
-    queryKey: ["claims"],
+  const {
+    data: claims,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: ["claims", isAdminView ? "admin" : "member"],
     queryFn: async () => {
       const token = await resolveToken(getToken);
       return fetchClaims(token);
     },
-    enabled: queryEnabled,
+    enabled: claimsQueryEnabled,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     placeholderData: keepPreviousData,
@@ -418,7 +504,10 @@ export function ClaimsListPage() {
     if (!organization || !inviteEmail.trim()) return;
     setInviting(true);
     try {
-      await createInvitation({ emailAddress: inviteEmail.trim(), role: "org:member" });
+      await createInvitation({
+        emailAddress: inviteEmail.trim(),
+        role: "org:member",
+      });
       toast.success(`Invite sent to ${inviteEmail.trim()}`);
       setInviteEmail("");
       setInviteOpen(false);
@@ -431,6 +520,17 @@ export function ClaimsListPage() {
 
   const policyPath = orgRole === "org:admin" ? "/admin/policy" : "/policy";
   const policyLabel = orgRole === "org:admin" ? "Policy Admin" : "Policy";
+  const claimsHeading = isAdminView ? "Claims To Review" : "My Claims";
+  const claimsEmptyTitle = isAdminView
+    ? "No member claims yet"
+    : "No claims yet";
+  const claimsEmptyBody = isAdminView
+    ? "When team members submit expenses, they will appear here for review."
+    : "Submit your first expense claim to get started.";
+  const isInitialLoading =
+    !authLoaded ||
+    isWaitingForActiveOrg ||
+    (isLoading && claimList.length === 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -441,19 +541,28 @@ export function ClaimsListPage() {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
               <Receipt className="h-3.5 w-3.5 text-primary-foreground" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">Expense Auditor</span>
+            <span className="text-sm font-semibold tracking-tight">
+              Expense Auditor
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => navigate(policyPath)}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate(policyPath)}
+            >
               <ShieldCheck className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{policyLabel}</span>
             </Button>
 
-            <Button size="sm" onClick={() => navigate("/claims/new")}>
-              <Plus className="mr-1.5 h-4 w-4" />
-              New Claim
-            </Button>
+            {!isAdminView && (
+              <Button size="sm" onClick={() => navigate("/claims/new")}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                New Claim
+              </Button>
+            )}
 
             <ThemeToggle />
 
@@ -483,7 +592,11 @@ export function ClaimsListPage() {
                         autoFocus
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={inviting || !inviteEmail.trim()}>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={inviting || !inviteEmail.trim()}
+                    >
                       {inviting ? "Sending…" : "Send invite"}
                     </Button>
                   </form>
@@ -498,7 +611,10 @@ export function ClaimsListPage() {
                   aria-label="Account menu"
                 >
                   <Avatar className="h-8 w-8 cursor-pointer">
-                    <AvatarImage src={user?.imageUrl} alt={user?.fullName ?? ""} />
+                    <AvatarImage
+                      src={user?.imageUrl}
+                      alt={user?.fullName ?? ""}
+                    />
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                       {initials(user?.firstName, user?.lastName)}
                     </AvatarFallback>
@@ -508,7 +624,9 @@ export function ClaimsListPage() {
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col gap-0.5">
-                    <p className="truncate text-sm font-medium leading-none">{user?.fullName}</p>
+                    <p className="truncate text-sm font-medium leading-none">
+                      {user?.fullName}
+                    </p>
                     <p className="truncate text-xs leading-none text-muted-foreground">
                       {user?.primaryEmailAddress?.emailAddress}
                     </p>
@@ -520,7 +638,10 @@ export function ClaimsListPage() {
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive focus:text-destructive"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
                 </DropdownMenuItem>
@@ -532,42 +653,60 @@ export function ClaimsListPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-3xl px-4 py-8">
-
         {/* Active policy banner */}
         {isWaitingForActiveOrg ? (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
             <RefreshCw className="h-4 w-4 animate-spin" />
             Loading your organization policy…
           </div>
-        ) : activePolicy && (
-          <button
-            onClick={() => navigate(policyPath)}
-            className="mb-6 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-left transition-colors hover:bg-emerald-500/10"
-          >
-            <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
-                Active policy
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="truncate text-sm font-medium">{activePolicy.name}</span>
-                {activePolicy.version && (
-                  <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
-                    Policy number{" "}
-                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
-                      {activePolicy.version}
-                    </span>
+        ) : (
+          activePolicy && (
+            <button
+              onClick={() => navigate(policyPath)}
+              className="mb-6 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-left transition-colors hover:bg-emerald-500/10"
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700/80 dark:text-emerald-300/80">
+                  Active policy
+                </p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="truncate text-sm font-medium">
+                    {activePolicy.name}
                   </span>
-                )}
+                  {activePolicy.version && (
+                    <span className="text-xs text-emerald-700/80 dark:text-emerald-300/80">
+                      Policy number{" "}
+                      <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
+                        {activePolicy.version}
+                      </span>
+                    </span>
+                  )}
+                </div>
               </div>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                View policy →
+              </span>
+            </button>
+          )
+        )}
+
+        {isAdminView && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">Admin review mode</p>
+              <p className="mt-1 text-muted-foreground">
+                Admin accounts can review member claims, but they cannot submit
+                expenses.
+              </p>
             </div>
-            <span className="shrink-0 text-xs text-muted-foreground">View policy →</span>
-          </button>
+          </div>
         )}
 
         {/* Claims header */}
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">My Claims</h2>
+          <h2 className="text-lg font-semibold">{claimsHeading}</h2>
           <div className="flex items-center gap-2">
             {isFetching && !isLoading && (
               <RefreshCw className="h-3.5 w-3.5 animate-spin text-muted-foreground/50" />
@@ -584,7 +723,9 @@ export function ClaimsListPage() {
         {claimList.length > 0 && (
           <div className="mb-2 flex items-center gap-4 px-4 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/60">
             <div className="w-2 shrink-0" />
-            <span className="flex-1">Merchant</span>
+            <span className="flex-1">
+              {isAdminView ? "Claim / Uploader" : "Merchant"}
+            </span>
             <span className="hidden sm:block w-24 text-right">Date</span>
             <span className="w-20 text-right">Amount</span>
             <span className="hidden sm:block w-24 text-right">Status</span>
@@ -593,7 +734,7 @@ export function ClaimsListPage() {
         )}
 
         {/* Show spinner only on true initial load (no data yet + Clerk ready) */}
-        {(!authLoaded || (isLoading && claimList.length === 0)) ? (
+        {isInitialLoading ? (
           <div className="flex justify-center py-16">
             <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
@@ -602,26 +743,37 @@ export function ClaimsListPage() {
             <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
               <Receipt className="h-10 w-10 text-muted-foreground" />
               <div>
-                <p className="font-medium">No claims yet</p>
+                <p className="font-medium">{claimsEmptyTitle}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Submit your first expense claim to get started.
+                  {claimsEmptyBody}
                 </p>
               </div>
-              <Button onClick={() => navigate("/claims/new")}>
-                <Plus className="mr-1.5 h-4 w-4" />
-                Submit Expense
-              </Button>
+              {!isAdminView && (
+                <Button onClick={() => navigate("/claims/new")}>
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Submit Expense
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-1.5">
-            {claimList.map((claim) => (
-              <ClaimRow
-                key={claim.id}
-                claim={claim}
-                onClick={() => navigate(`/claims/${claim.id}`)}
-              />
-            ))}
+            {claimList.map((claim) => {
+              const uploaderLabel = formatOrganizationMemberLabel(
+                memberDirectory[claim.userId],
+                claim.userId,
+              );
+
+              return (
+                <ClaimRow
+                  key={claim.id}
+                  claim={claim}
+                  isAdminView={isAdminView}
+                  onClick={() => navigate(`/claims/${claim.id}`)}
+                  uploaderLabel={isAdminView ? uploaderLabel : undefined}
+                />
+              );
+            })}
           </div>
         )}
       </main>

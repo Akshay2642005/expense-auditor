@@ -95,6 +95,13 @@ func GetOrgID(c echo.Context) string {
 	return ""
 }
 
+func GetUserRole(c echo.Context) string {
+	if userRole, ok := c.Get(UserRoleKey).(string); ok {
+		return userRole
+	}
+	return ""
+}
+
 func GetLogger(c echo.Context) *zerolog.Logger {
 	if logger, ok := c.Get(LoggerKey).(*zerolog.Logger); ok {
 		return logger

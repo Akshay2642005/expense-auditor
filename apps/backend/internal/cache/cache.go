@@ -21,7 +21,13 @@ const (
 )
 
 // Key builders — all keys namespaced under "epau:"
-func KeyClaimList(userID string) string   { return fmt.Sprintf("epau:claims:user:%s", userID) }
+func KeyClaimList(userID string) string { return fmt.Sprintf("epau:claims:user:%s", userID) }
+func KeyAdminClaimList(orgID string, userID string) string {
+	return fmt.Sprintf("epau:claims:admin:%s:%s", orgID, userID)
+}
+func KeyAdminClaimListPattern(orgID string) string {
+	return fmt.Sprintf("epau:claims:admin:%s:*", orgID)
+}
 func KeyClaim(claimID string) string      { return fmt.Sprintf("epau:claim:%s", claimID) }
 func KeyAudit(claimID string) string      { return fmt.Sprintf("epau:audit:claim:%s", claimID) }
 func KeyPolicyActive(orgID string) string { return fmt.Sprintf("epau:policy:active:%s", orgID) }

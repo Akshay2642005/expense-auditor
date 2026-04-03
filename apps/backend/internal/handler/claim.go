@@ -111,6 +111,7 @@ func (h *ClaimHandler) SubmitClaim(c echo.Context) error {
 	out, err := h.claimService.SubmitClaim(c.Request().Context(), &service.SubmitClaimInput{
 		UserID:          userID,
 		OrgID:           middleware.GetOrgID(c),
+		UserRole:        middleware.GetUserRole(c),
 		BusinessPurpose: req.BusinessPurpose,
 		ClaimedDate:     claimedDate,
 		ExpenseCategory: model.ExpenseCategory(req.ExpenseCategory),
@@ -136,7 +137,21 @@ func (h *ClaimHandler) ListClaims(c echo.Context, _ *ListClaimsRequest) (any, er
 		return nil, errs.NewUnauthorizedError("unauthorized", false)
 	}
 
-	claims, err := h.claimService.GetUserClaims(c.Request().Context(), userID)
+	userRole := middleware.GetUserRole(c)
+	orgID := middleware.GetOrgID(c)
+
+	var (
+		claims any
+		err    error
+	)
+	if userRole == "org:admin" {
+		if orgID == "" {
+			return []model.Claim{}, nil
+		}
+		claims, err = h.claimService.GetAdminReviewClaims(c.Request().Context(), orgID, userID)
+	} else {
+		claims, err = h.claimService.GetUserClaims(c.Request().Context(), userID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +182,13 @@ func (h *ClaimHandler) GetClaim(c echo.Context, req *GetClaimRequest) (any, erro
 	}
 
 	id, _ := uuid.Parse(req.ID) // already validated
-	return h.claimService.GetClaim(c.Request().Context(), id, userID)
+	return h.claimService.GetClaim(
+		c.Request().Context(),
+		id,
+		userID,
+		middleware.GetOrgID(c),
+		middleware.GetUserRole(c),
+	)
 }
 
 // --- GET /api/v1/claims/:id/receipt ---
@@ -198,7 +219,13 @@ func (h *ClaimHandler) GetReceipt(c echo.Context) error {
 		return errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
 	}
 
-	data, contentType, err := h.claimService.StreamReceipt(c.Request().Context(), id, userID)
+	data, contentType, err := h.claimService.StreamReceipt(
+		c.Request().Context(),
+		id,
+		userID,
+		middleware.GetOrgID(c),
+		middleware.GetUserRole(c),
+	)
 	if err != nil {
 		return err
 	}

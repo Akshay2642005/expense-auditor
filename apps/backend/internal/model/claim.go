@@ -42,6 +42,7 @@ type Claim struct {
 	Base
 	UserID          string          `json:"userId"          db:"user_id"`
 	OrgID           string          `json:"orgId"           db:"org_id"`
+	SubmittedByRole string          `json:"submittedByRole" db:"submitted_by_role"`
 	ReceiptFileID   uuid.UUID       `json:"receiptFileId"   db:"receipt_file_id"`
 	BusinessPurpose string          `json:"businessPurpose" db:"business_purpose"`
 	ClaimedDate     time.Time       `json:"claimedDate"     db:"claimed_date"`

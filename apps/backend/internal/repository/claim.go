@@ -40,14 +40,14 @@ func (r *ClaimRepository) CreateReceiptFile(
 
 func (r *ClaimRepository) CreateClaim(ctx context.Context, c *model.Claim) (*model.Claim, error) {
 	rows, err := r.db.Query(ctx, `
-		INSERT INTO claims (user_id, org_id, receipt_file_id, business_purpose, claimed_date, expense_category)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO claims (user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING
-			id, user_id, org_id, receipt_file_id, business_purpose, claimed_date, expense_category,
+			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
 			status, merchant_name, receipt_date, amount, currency,
 			ocr_raw_json::text AS ocr_raw_json,
 			date_mismatch, ocr_error, created_at, updated_at
-	`, c.UserID, c.OrgID, c.ReceiptFileID, c.BusinessPurpose, c.ClaimedDate, string(c.ExpenseCategory))
+	`, c.UserID, c.OrgID, c.SubmittedByRole, c.ReceiptFileID, c.BusinessPurpose, c.ClaimedDate, string(c.ExpenseCategory))
 	if err != nil {
 		return nil, fmt.Errorf("create claim: %w", err)
 	}
@@ -84,7 +84,7 @@ func (r *ClaimRepository) FindReceiptFileByHash(ctx context.Context, hash string
 func (r *ClaimRepository) GetClaimByID(ctx context.Context, id uuid.UUID) (*model.Claim, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			id, user_id, org_id, receipt_file_id, business_purpose, claimed_date, expense_category,
+			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
 			status, merchant_name, receipt_date, amount, currency,
 			ocr_raw_json::text AS ocr_raw_json,
 			date_mismatch, ocr_error, created_at, updated_at,
@@ -108,7 +108,7 @@ func (r *ClaimRepository) GetClaimByID(ctx context.Context, id uuid.UUID) (*mode
 func (r *ClaimRepository) GetClaimsByUserID(ctx context.Context, userID string) ([]model.Claim, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT
-			id, user_id, org_id, receipt_file_id, business_purpose, claimed_date, expense_category,
+			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
 			status, merchant_name, receipt_date, amount, currency,
 			ocr_raw_json::text AS ocr_raw_json,
 			date_mismatch, ocr_error, created_at, updated_at,
@@ -124,6 +124,34 @@ func (r *ClaimRepository) GetClaimsByUserID(ctx context.Context, userID string) 
 	claims, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[model.Claim])
 	if err != nil {
 		return nil, fmt.Errorf("collect claims: %w", err)
+	}
+
+	return claims, nil
+}
+
+// GetClaimsForAdminReview returns org claims that were submitted by members,
+// excluding claims owned by the current admin reviewer.
+func (r *ClaimRepository) GetClaimsForAdminReview(ctx context.Context, orgID string, excludedUserID string) ([]model.Claim, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT
+			id, user_id, org_id, submitted_by_role, receipt_file_id, business_purpose, claimed_date, expense_category,
+			status, merchant_name, receipt_date, amount, currency,
+			ocr_raw_json::text AS ocr_raw_json,
+			date_mismatch, ocr_error, created_at, updated_at,
+			policy_id, policy_chunks_used::text AS policy_chunks_used
+		FROM claims
+		WHERE org_id = $1
+		  AND submitted_by_role = 'org:member'
+		  AND user_id <> $2
+		ORDER BY created_at DESC
+	`, orgID, excludedUserID)
+	if err != nil {
+		return nil, fmt.Errorf("get claims for admin review: %w", err)
+	}
+
+	claims, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[model.Claim])
+	if err != nil {
+		return nil, fmt.Errorf("collect admin review claims: %w", err)
 	}
 
 	return claims, nil

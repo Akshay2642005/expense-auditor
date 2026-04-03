@@ -31,7 +31,13 @@ func NewAuditService(
 	}
 }
 
-func (s *AuditService) GetClaimAudit(ctx context.Context, claimID uuid.UUID, userID string) (any, error) {
+func (s *AuditService) GetClaimAudit(
+	ctx context.Context,
+	claimID uuid.UUID,
+	userID string,
+	orgID string,
+	userRole string,
+) (any, error) {
 	key := cache.KeyAudit(claimID.String())
 
 	// Check audit cache first — if hit, we still need to verify ownership.
@@ -40,7 +46,7 @@ func (s *AuditService) GetClaimAudit(ctx context.Context, claimID uuid.UUID, use
 		// Verify ownership via claim cache (also avoids DB)
 		claimKey := cache.KeyClaim(claimID.String())
 		if cachedClaim, claimOk, _ := cache.Get[model.Claim](ctx, s.server.Cache, claimKey); claimOk {
-			if cachedClaim.UserID != userID {
+			if !canViewClaim(cachedClaim, userID, orgID, userRole) {
 				return nil, errs.NewForbiddenError("access denied", false)
 			}
 			return cached, nil
@@ -48,14 +54,14 @@ func (s *AuditService) GetClaimAudit(ctx context.Context, claimID uuid.UUID, use
 		// Claim not in cache — fall through to DB ownership check below
 	}
 
-	ownerUserID, err := s.repos.Claim.GetClaimOwnerUserID(ctx, claimID)
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.NewNotFoundError("claim not found", false, nil)
 		}
 		return nil, err
 	}
-	if ownerUserID != userID {
+	if !canViewClaim(claim, userID, orgID, userRole) {
 		return nil, errs.NewForbiddenError("access denied", false)
 	}
 
@@ -121,8 +127,13 @@ func (s *AuditService) invalidateClaimCaches(ctx context.Context, claimID uuid.U
 		cache.KeyClaim(claimID.String()),
 	}
 	// Also bust the list cache so the status change is visible immediately
-	if userID, err := s.repos.Claim.GetClaimOwnerUserID(ctx, claimID); err == nil {
-		keys = append(keys, cache.KeyClaimList(userID))
+	if claim, err := s.repos.Claim.GetClaimByID(ctx, claimID); err == nil {
+		keys = append(keys, cache.KeyClaimList(claim.UserID))
+		if claim.OrgID != "" {
+			if err := cache.InvalidatePattern(ctx, s.server.Cache, cache.KeyAdminClaimListPattern(claim.OrgID)); err != nil {
+				s.server.Logger.Warn().Err(err).Str("org_id", claim.OrgID).Msg("failed to invalidate admin claim list cache")
+			}
+		}
 	}
 	_ = cache.Del(ctx, s.server.Cache, keys...)
 }
