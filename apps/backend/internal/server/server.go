@@ -37,11 +37,13 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerPkg.Lo
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
+	//
+	// redisOpts := &redis.Options{
+	// 	Addr: cfg.Redis.Address,
+	// }
 
-	redisOpts := &redis.Options{
-		Addr: cfg.Redis.Address,
-	}
-	redisClient := redis.NewClient(redisOpts)
+	opts, err := redis.ParseURL(cfg.Redis.Address)
+	redisClient := redis.NewClient(opts)
 
 	if loggerService != nil && loggerService.GetApplication() != nil {
 		redisClient.AddHook(nrredis.NewHook(redisClient.Options()))
