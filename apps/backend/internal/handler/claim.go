@@ -18,12 +18,18 @@ import (
 type ClaimHandler struct {
 	Handler
 	claimService *service.ClaimService
+	auditService *service.AuditService
 }
 
-func NewClaimHandler(s *server.Server, claimService *service.ClaimService) *ClaimHandler {
+func NewClaimHandler(
+	s *server.Server,
+	claimService *service.ClaimService,
+	auditService *service.AuditService,
+) *ClaimHandler {
 	return &ClaimHandler{
 		Handler:      NewHandler(s),
 		claimService: claimService,
+		auditService: auditService,
 	}
 }
 
@@ -346,6 +352,98 @@ func (h *ClaimHandler) ListAdminClaims(c echo.Context, req *ListAdminClaimsReque
 		orgID,
 		userID,
 		filters,
+	)
+}
+
+type GetAdminClaimRequest struct {
+	ID string `param:"id"`
+}
+
+func (r *GetAdminClaimRequest) Validate() error {
+	if r.ID == "" {
+		return errs.NewBadRequestError("id is required", true, nil, nil, nil)
+	}
+	if _, err := uuid.Parse(r.ID); err != nil {
+		return errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
+	}
+	return nil
+}
+
+func (h *ClaimHandler) GetAdminClaim(c echo.Context, req *GetAdminClaimRequest) (any, error) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return nil, errs.NewUnauthorizedError("unauthorized", false)
+	}
+
+	id, _ := uuid.Parse(req.ID)
+	return h.claimService.GetAdminClaimDetail(
+		c.Request().Context(),
+		id,
+		middleware.GetOrgID(c),
+		userID,
+	)
+}
+
+type OverrideAdminClaimRequest struct {
+	ID       string `param:"id"`
+	Decision string `json:"decision"`
+	Reason   string `json:"reason"`
+}
+
+func (r *OverrideAdminClaimRequest) Validate() error {
+	if r.ID == "" {
+		return errs.NewBadRequestError("id is required", true, nil, nil, nil)
+	}
+	if _, err := uuid.Parse(r.ID); err != nil {
+		return errs.NewBadRequestError("id must be a valid UUID", true, nil, nil, nil)
+	}
+
+	switch strings.TrimSpace(r.Decision) {
+	case string(model.AuditDecisionApproved), string(model.AuditDecisionFlagged), string(model.AuditDecisionRejected):
+	default:
+		return errs.NewBadRequestError(
+			"decision must be one of: approved, flagged, rejected",
+			true, nil, nil, nil,
+		)
+	}
+
+	trimmedReason := strings.TrimSpace(r.Reason)
+	if trimmedReason == "" {
+		return errs.NewBadRequestError("reason is required", true, nil, nil, nil)
+	}
+	if len(trimmedReason) < 10 {
+		return errs.NewBadRequestError("reason must be at least 10 characters", true, nil, nil, nil)
+	}
+	if len(trimmedReason) > 1000 {
+		return errs.NewBadRequestError("reason must not exceed 1000 characters", true, nil, nil, nil)
+	}
+
+	return nil
+}
+
+func (h *ClaimHandler) OverrideAdminClaim(c echo.Context, req *OverrideAdminClaimRequest) (any, error) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return nil, errs.NewUnauthorizedError("unauthorized", false)
+	}
+
+	id, _ := uuid.Parse(req.ID)
+	if err := h.auditService.OverrideClaimDecision(
+		c.Request().Context(),
+		id,
+		userID,
+		middleware.GetOrgID(c),
+		model.AuditDecisionStatus(strings.TrimSpace(req.Decision)),
+		strings.TrimSpace(req.Reason),
+	); err != nil {
+		return nil, err
+	}
+
+	return h.claimService.GetAdminClaimDetail(
+		c.Request().Context(),
+		id,
+		middleware.GetOrgID(c),
+		userID,
 	)
 }
 

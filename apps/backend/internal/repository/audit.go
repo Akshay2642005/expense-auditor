@@ -81,3 +81,38 @@ func (r *AuditRepository) SaveDecision(
 
 	return nil
 }
+
+func (r *AuditRepository) SaveOverrideDecision(
+	ctx context.Context,
+	claimID uuid.UUID,
+	decision model.AuditDecisionStatus,
+	reason string,
+	overriddenBy string,
+	citedPolicyText *string,
+) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin audit override tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO audit_decisions
+			(claim_id, decision, reason, cited_policy_text, confidence, ai_model, overridden_by, override_reason)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, claimID, string(decision), reason, citedPolicyText, 1.0, "human_override", overriddenBy, reason); err != nil {
+		return fmt.Errorf("insert audit override decision: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE claims SET status = $1, updated_at = now() WHERE id = $2
+	`, string(decision), claimID); err != nil {
+		return fmt.Errorf("update claim status from audit override: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit audit override decision: %w", err)
+	}
+
+	return nil
+}

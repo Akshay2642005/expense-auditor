@@ -60,3 +60,17 @@ type Claim struct {
 	PolicyID         *uuid.UUID `db:"policy_id"`
 	PolicyChunksUsed []byte     `db:"policy_chunks_used"`
 }
+
+type AdminClaimPolicyChunk struct {
+	ChunkText string  `json:"chunkText"`
+	Category  string  `json:"category"`
+	PageNum   int     `json:"pageNum"`
+	Score     float64 `json:"score"`
+}
+
+type AdminClaimDetail struct {
+	Claim        *Claim                  `json:"claim"`
+	Audit        *AuditDecision          `json:"audit"`
+	PolicyID     *uuid.UUID              `json:"policyId"`
+	PolicyChunks []AdminClaimPolicyChunk `json:"policyChunks"`
+}

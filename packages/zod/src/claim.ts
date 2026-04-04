@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ZAuditResponse } from "./audit.js";
 
 export const ZClaimStatus = z.enum([
   "pending",
@@ -70,10 +71,30 @@ export const ZClaimResponse = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const ZAdminClaimPolicyChunkResponse = z.object({
+  chunkText: z.string(),
+  category: z.string(),
+  pageNum: z.number().int(),
+  score: z.number(),
+});
+
+export const ZAdminClaimDetailResponse = z.object({
+  claim: ZClaimResponse,
+  audit: ZAuditResponse.nullable(),
+  policyId: z.string().uuid().nullable(),
+  policyChunks: z.array(ZAdminClaimPolicyChunkResponse),
+});
+
 export type ClaimStatus = z.infer<typeof ZClaimStatus>;
 export type ExpenseCategory = z.infer<typeof ZExpenseCategory>;
 export type SubmitClaimResponse = z.infer<typeof ZSubmitClaimResponse>;
 export type ClaimResponse = z.infer<typeof ZClaimResponse>;
+export type AdminClaimPolicyChunkResponse = z.infer<
+  typeof ZAdminClaimPolicyChunkResponse
+>;
+export type AdminClaimDetailResponse = z.infer<
+  typeof ZAdminClaimDetailResponse
+>;
 export type AdminClaimFlagFilter = z.infer<typeof ZAdminClaimFlagFilter>;
 export type AdminClaimDateField = z.infer<typeof ZAdminClaimDateField>;
 export type AdminClaimSortBy = z.infer<typeof ZAdminClaimSortBy>;

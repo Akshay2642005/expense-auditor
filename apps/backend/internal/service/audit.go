@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/Akshay2642005/expense-auditor/internal/cache"
 	"github.com/Akshay2642005/expense-auditor/internal/errs"
@@ -115,6 +117,56 @@ func (s *AuditService) SaveJobAuditDecisionWithRaw(
 	if err := s.repos.Audit.SaveDecision(ctx, claimID, decision, reason, citedPolicyText, confidence, aiModel, deterministicRule, rawModelOutput); err != nil {
 		return err
 	}
+	s.invalidateClaimCaches(ctx, claimID)
+	return nil
+}
+
+func (s *AuditService) OverrideClaimDecision(
+	ctx context.Context,
+	claimID uuid.UUID,
+	adminUserID string,
+	orgID string,
+	decision model.AuditDecisionStatus,
+	reason string,
+) error {
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errs.NewNotFoundError("claim not found", false, nil)
+		}
+		return err
+	}
+
+	if !canViewClaim(claim, adminUserID, orgID, "org:admin") {
+		return errs.NewForbiddenError("access denied", false)
+	}
+
+	trimmedReason := strings.TrimSpace(reason)
+	if trimmedReason == "" {
+		return errs.NewBadRequestError("reason is required", true, nil, nil, nil)
+	}
+
+	var citedPolicyText *string
+	latestAudit, err := s.repos.Audit.GetByClaimID(ctx, claimID)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("load latest audit decision: %w", err)
+		}
+	} else {
+		citedPolicyText = latestAudit.CitedPolicyText
+	}
+
+	if err := s.repos.Audit.SaveOverrideDecision(
+		ctx,
+		claimID,
+		decision,
+		trimmedReason,
+		adminUserID,
+		citedPolicyText,
+	); err != nil {
+		return err
+	}
+
 	s.invalidateClaimCaches(ctx, claimID)
 	return nil
 }

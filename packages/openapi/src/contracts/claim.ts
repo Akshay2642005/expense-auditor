@@ -2,6 +2,8 @@ import { initContract } from "@ts-rest/core";
 import { z } from "zod";
 import {
   ZAdminClaimListQuery,
+  ZAdminClaimDetailResponse,
+  ZAdminClaimOverrideRequest,
   ZClaimResponse,
   ZSubmitClaimResponse,
 } from "@auditor/zod";
@@ -55,6 +57,34 @@ export const claimContract = c.router({
     pathParams: z.object({ id: z.string().uuid() }),
     responses: {
       200: ZClaimResponse,
+      401: ZErrorResponse,
+      403: ZErrorResponse,
+      404: ZErrorResponse,
+    },
+  },
+
+  getAdminClaim: {
+    summary: "Get admin review detail for a single claim",
+    method: "GET",
+    path: "/v1/admin/claims/:id",
+    pathParams: z.object({ id: z.string().uuid() }),
+    responses: {
+      200: ZAdminClaimDetailResponse,
+      401: ZErrorResponse,
+      403: ZErrorResponse,
+      404: ZErrorResponse,
+    },
+  },
+
+  overrideAdminClaim: {
+    summary: "Override the current admin review decision for a claim",
+    method: "PATCH",
+    path: "/v1/admin/claims/:id/override",
+    pathParams: z.object({ id: z.string().uuid() }),
+    body: ZAdminClaimOverrideRequest,
+    responses: {
+      200: ZAdminClaimDetailResponse,
+      400: ZErrorResponse,
       401: ZErrorResponse,
       403: ZErrorResponse,
       404: ZErrorResponse,

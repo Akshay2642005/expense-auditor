@@ -1,8 +1,10 @@
 import type {
+  AdminClaimDetailResponse,
   AdminClaimDateField,
   AdminClaimFlagFilter,
   AdminClaimSortBy,
   AdminClaimSortDir,
+  AdminClaimOverrideRequest,
   ClaimResponse,
   ClaimStatus,
   SubmitClaimResponse,
@@ -107,6 +109,44 @@ export function useClaimsApi() {
     throw new Error(getApiErrorMessage(response.body, "Failed to load claim"));
   }, [api]);
 
+  const getAdminClaimDetail = useCallback(
+    async (id: string): Promise<AdminClaimDetailResponse> => {
+      const response = await api.Claim.getAdminClaim({
+        params: { id },
+      });
+
+      if (response.status === 200) {
+        return response.body;
+      }
+
+      throw new Error(
+        getApiErrorMessage(response.body, "Failed to load admin claim"),
+      );
+    },
+    [api],
+  );
+
+  const overrideAdminClaim = useCallback(
+    async (
+      id: string,
+      payload: AdminClaimOverrideRequest,
+    ): Promise<AdminClaimDetailResponse> => {
+      const response = await api.Claim.overrideAdminClaim({
+        params: { id },
+        body: payload,
+      });
+
+      if (response.status === 200) {
+        return response.body;
+      }
+
+      throw new Error(
+        getApiErrorMessage(response.body, "Could not save reviewer decision"),
+      );
+    },
+    [api],
+  );
+
   const recomputePolicyMatch = useCallback(
     async (id: string): Promise<ClaimResponse> => {
       const response = await api.Claim.recomputePolicy({
@@ -130,8 +170,18 @@ export function useClaimsApi() {
       listClaims,
       listAdminClaims,
       getClaim,
+      getAdminClaimDetail,
+      overrideAdminClaim,
       recomputePolicyMatch,
     }),
-    [submitClaim, listClaims, listAdminClaims, getClaim, recomputePolicyMatch],
+    [
+      submitClaim,
+      listClaims,
+      listAdminClaims,
+      getClaim,
+      getAdminClaimDetail,
+      overrideAdminClaim,
+      recomputePolicyMatch,
+    ],
   );
 }

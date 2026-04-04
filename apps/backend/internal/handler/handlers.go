@@ -18,7 +18,7 @@ func NewHandlers(s *server.Server, services *service.Services) *Handlers {
 	return &Handlers{
 		Health:       NewHealthHandler(s),
 		OpenAPI:      NewOpenAPIHandler(s),
-		Claim:        NewClaimHandler(s, services.Claim),
+		Claim:        NewClaimHandler(s, services.Claim, services.Audit),
 		Policy:       NewPolicyHandler(s, services.Policy),
 		Organization: NewOrganizationHandler(s, services.Auth),
 		AuditHandler: NewAuditHandler(s, services.Audit),

@@ -331,6 +331,60 @@ func (s *ClaimService) GetAdminReviewClaims(
 	return claims, nil
 }
 
+func (s *ClaimService) GetAdminClaimDetail(
+	ctx context.Context,
+	claimID uuid.UUID,
+	orgID string,
+	adminUserID string,
+) (*model.AdminClaimDetail, error) {
+	if orgID == "" {
+		return nil, errs.NewForbiddenError("access denied", false)
+	}
+
+	claim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errs.NewNotFoundError("claim not found", false, nil)
+		}
+		return nil, fmt.Errorf("failed to get claim: %w", err)
+	}
+
+	if !canViewClaim(claim, adminUserID, orgID, "org:admin") {
+		return nil, errs.NewForbiddenError("access denied", false)
+	}
+
+	var audit *model.AuditDecision
+	audit, err = s.repos.Audit.GetByClaimID(ctx, claimID)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("failed to get audit decision: %w", err)
+		}
+		audit = nil
+	}
+
+	rawChunks, err := model.UnmarshalRetrievedChunks(claim.PolicyChunksUsed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse retrieved policy chunks: %w", err)
+	}
+
+	policyChunks := make([]model.AdminClaimPolicyChunk, 0, len(rawChunks))
+	for _, chunk := range rawChunks {
+		policyChunks = append(policyChunks, model.AdminClaimPolicyChunk{
+			ChunkText: chunk.ChunkText,
+			Category:  chunk.Category,
+			PageNum:   chunk.PageNum,
+			Score:     chunk.Score,
+		})
+	}
+
+	return &model.AdminClaimDetail{
+		Claim:        claim,
+		Audit:        audit,
+		PolicyID:     claim.PolicyID,
+		PolicyChunks: policyChunks,
+	}, nil
+}
+
 // RecomputePolicyMatch re-runs policy retrieval + cap check for a claim.
 // Admin-only route should call this; no ownership check here.
 func (s *ClaimService) RecomputePolicyMatch(ctx context.Context, claimID uuid.UUID) (*model.Claim, error) {

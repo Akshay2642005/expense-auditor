@@ -26,8 +26,8 @@ const operationMapper: OperationMapper = (operation, appRoute) => ({
   ...operation,
   ...(hasSecurity(appRoute.metadata)
     ? {
-        security: appRoute.metadata.openApiSecurity,
-      }
+      security: appRoute.metadata.openApiSecurity,
+    }
     : {}),
 });
 
@@ -70,4 +70,3 @@ export const OpenAPI = Object.assign(
     },
   }
 );
-
