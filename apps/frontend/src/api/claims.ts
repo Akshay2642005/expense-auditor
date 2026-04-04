@@ -1,4 +1,3 @@
-import { API_URL } from "@/config/env";
 import type {
   AdminClaimDateField,
   AdminClaimFlagFilter,
@@ -6,9 +5,10 @@ import type {
   AdminClaimSortDir,
   ClaimResponse,
   ClaimStatus,
+  SubmitClaimResponse,
 } from "@auditor/zod";
-import { useAuth } from "@clerk/clerk-react";
-import axios from "axios";
+import { useCallback, useMemo } from "react";
+import { getApiErrorMessage, useApiClient } from "@/api/index";
 
 export interface SubmitClaimPayload {
   file: File;
@@ -17,11 +17,7 @@ export interface SubmitClaimPayload {
   expenseCategory: "meals" | "transport" | "lodging" | "other";
 }
 
-export interface SubmitClaimResult {
-  claimId: string;
-  status: string;
-  message: string;
-}
+export type SubmitClaimResult = SubmitClaimResponse;
 
 export interface AdminClaimsQuery {
   q?: string;
@@ -35,16 +31,25 @@ export interface AdminClaimsQuery {
   sortDir?: AdminClaimSortDir;
 }
 
-// Custom hook for claim mutations that can't go through ts-rest (multipart)
 export function useClaimsApi() {
-  const { getToken } = useAuth();
+  const api = useApiClient();
 
-  const getAuthHeaders = async () => {
-    const token = await getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
+  const toAdminClaimsQuery = useCallback(
+    (query?: AdminClaimsQuery) => ({
+      q: query?.q,
+      statuses: query?.statuses?.length ? query.statuses.join(",") : undefined,
+      uploaderUserId: query?.uploaderUserId,
+      flagged: query?.flagged && query.flagged !== "all" ? query.flagged : undefined,
+      dateField: query?.dateField && query.dateField !== "submitted" ? query.dateField : undefined,
+      dateFrom: query?.dateFrom,
+      dateTo: query?.dateTo,
+      sortBy: query?.sortBy && query.sortBy !== "submittedDate" ? query.sortBy : undefined,
+      sortDir: query?.sortDir && query.sortDir !== "desc" ? query.sortDir : undefined,
+    }),
+    [],
+  );
 
-  const submitClaim = async (
+  const submitClaim = useCallback(async (
     payload: SubmitClaimPayload,
   ): Promise<SubmitClaimResult> => {
     const form = new FormData();
@@ -53,49 +58,80 @@ export function useClaimsApi() {
     form.append("claimed_date", payload.claimedDate);
     form.append("expense_category", payload.expenseCategory);
 
-    const headers = await getAuthHeaders();
-    const response = await axios.post<SubmitClaimResult>(
-      `${API_URL}/api/v1/claims`,
-      form,
-      { headers: { ...headers } },
-    );
-    return response.data;
-  };
+    const response = await api.Claim.submitClaim({
+      body: form,
+    });
 
-  const listAdminClaims = async (
+    if (response.status === 202) {
+      return response.body;
+    }
+
+    throw new Error(getApiErrorMessage(response.body, "Submission failed"));
+  }, [api]);
+
+  const listClaims = useCallback(async (): Promise<ClaimResponse[]> => {
+    const response = await api.Claim.listClaims();
+
+    if (response.status === 200) {
+      return response.body;
+    }
+
+    throw new Error(getApiErrorMessage(response.body, "Failed to load claims"));
+  }, [api]);
+
+  const listAdminClaims = useCallback(async (
     query?: AdminClaimsQuery,
   ): Promise<ClaimResponse[]> => {
-    const headers = await getAuthHeaders();
-    const params = new URLSearchParams();
+    const response = await api.Claim.listAdminClaims({
+      query: toAdminClaimsQuery(query),
+    });
 
-    if (query?.q) params.set("q", query.q);
-    if (query?.statuses?.length)
-      params.set("statuses", query.statuses.join(","));
-    if (query?.uploaderUserId)
-      params.set("uploaderUserId", query.uploaderUserId);
-    if (query?.flagged && query.flagged !== "all") {
-      params.set("flagged", query.flagged);
-    }
-    if (query?.dateField && query.dateField !== "submitted") {
-      params.set("dateField", query.dateField);
-    }
-    if (query?.dateFrom) params.set("dateFrom", query.dateFrom);
-    if (query?.dateTo) params.set("dateTo", query.dateTo);
-    if (query?.sortBy && query.sortBy !== "submittedDate") {
-      params.set("sortBy", query.sortBy);
-    }
-    if (query?.sortDir && query.sortDir !== "desc") {
-      params.set("sortDir", query.sortDir);
+    if (response.status === 200) {
+      return response.body;
     }
 
-    const queryString = params.toString();
-    const response = await axios.get<ClaimResponse[]>(
-      `${API_URL}/api/v1/admin/claims${queryString ? `?${queryString}` : ""}`,
-      { headers },
+    throw new Error(
+      getApiErrorMessage(response.body, "Failed to load review claims"),
     );
+  }, [api, toAdminClaimsQuery]);
 
-    return response.data;
-  };
+  const getClaim = useCallback(async (id: string): Promise<ClaimResponse> => {
+    const response = await api.Claim.getClaim({
+      params: { id },
+    });
 
-  return { submitClaim, listAdminClaims };
+    if (response.status === 200) {
+      return response.body;
+    }
+
+    throw new Error(getApiErrorMessage(response.body, "Failed to load claim"));
+  }, [api]);
+
+  const recomputePolicyMatch = useCallback(
+    async (id: string): Promise<ClaimResponse> => {
+      const response = await api.Claim.recomputePolicy({
+        params: { id },
+      });
+
+      if (response.status === 200) {
+        return response.body;
+      }
+
+      throw new Error(
+        getApiErrorMessage(response.body, "Could not re-run policy match"),
+      );
+    },
+    [api],
+  );
+
+  return useMemo(
+    () => ({
+      submitClaim,
+      listClaims,
+      listAdminClaims,
+      getClaim,
+      recomputePolicyMatch,
+    }),
+    [submitClaim, listClaims, listAdminClaims, getClaim, recomputePolicyMatch],
+  );
 }

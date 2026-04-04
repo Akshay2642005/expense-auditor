@@ -1,27 +1,8 @@
 import { useCallback, useMemo } from "react";
-import { useAuth } from "@clerk/clerk-react";
 import axios, { type AxiosRequestConfig } from "axios";
 import { API_URL } from "@/config/env";
 import type { AuditResponse } from "@auditor/zod";
-
-/**
- * Returns an async function that resolves to auth headers.
- * Follows the pattern used in `useClaimsApi` for consistency:
- * - If a token is present, returns `{ Authorization: "Bearer <token>" }`
- * - Otherwise, returns an empty object.
- */
-function useAuthHeaders() {
-  const { getToken } = useAuth();
-
-  return useCallback(async (): Promise<Record<string, string>> => {
-    for (let i = 0; i < 5; i++) {
-      const token = await getToken();
-      if (token) return { Authorization: `Bearer ${token}` };
-      await new Promise((r) => setTimeout(r, 200));
-    }
-    throw new Error("Auth token unavailable");
-  }, [getToken]);
-}
+import { getApiErrorMessage, useApiClient, useAuthHeaders } from "@/api/index";
 
 /**
  * Hook providing typed helpers for audit-related endpoints.
@@ -35,30 +16,27 @@ function useAuthHeaders() {
  * use `AxiosRequestConfig` for request options (including AbortSignal).
  */
 export function useAuditApi() {
+  const api = useApiClient();
   const getHeaders = useAuthHeaders();
 
   const getAudit = useCallback(
     async (claimId: string, signal?: AbortSignal): Promise<AuditResponse | null> => {
-      const headers = await getHeaders();
-      const url = `${API_URL}/api/v1/claims/${encodeURIComponent(claimId)}/audit`;
+      void signal;
+      const response = await api.Audit.getAuditResult({
+        params: { id: claimId },
+      });
 
-      const config: AxiosRequestConfig = {
-        headers,
-        signal,
-      };
-
-      try {
-        const { data } = await axios.get<AuditResponse>(url, config);
-        return data;
-      } catch (err: unknown) {
-        // 404 indicates no audit produced yet — map to null for callers.
-        if (axios.isAxiosError(err) && err.response?.status === 404) {
-          return null;
-        }
-        throw err;
+      if (response.status === 200) {
+        return response.body;
       }
+
+      if (response.status === 404) {
+        return null;
+      }
+
+      throw new Error(getApiErrorMessage(response.body, "Failed to load audit"));
     },
-    [getHeaders]
+    [api],
   );
 
   const hasAudit = useCallback(

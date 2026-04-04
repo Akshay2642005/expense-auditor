@@ -708,6 +708,189 @@
         }
       }
     },
+    "/v1/admin/claims/{id}/recompute-policy": {
+      "post": {
+        "summary": "Recompute policy matching for a claim",
+        "tags": [
+          "Claim"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "operationId": "recomputePolicy",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "userId": {
+                      "type": "string"
+                    },
+                    "receiptFileId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "businessPurpose": {
+                      "type": "string"
+                    },
+                    "claimedDate": {
+                      "type": "string"
+                    },
+                    "expenseCategory": {
+                      "type": "string",
+                      "enum": [
+                        "meals",
+                        "transport",
+                        "lodging",
+                        "other"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "processing",
+                        "ocr_complete",
+                        "needs_review",
+                        "ocr_failed",
+                        "policy_matched",
+                        "auditing",
+                        "approved",
+                        "flagged",
+                        "rejected"
+                      ]
+                    },
+                    "merchantName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "receiptDate": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "amount": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "currency": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dateMismatch": {
+                      "type": "boolean"
+                    },
+                    "ocrError": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "userId",
+                    "receiptFileId",
+                    "businessPurpose",
+                    "claimedDate",
+                    "expenseCategory",
+                    "status",
+                    "dateMismatch",
+                    "createdAt",
+                    "updatedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/claims/{id}/audit": {
       "get": {
         "summary": "Get audit result for a claim",
@@ -842,11 +1025,100 @@
         }
       }
     },
-    "/api/v1/admin/policy": {
+    "/v1/policy/active": {
+      "get": {
+        "summary": "Get the active policy for the authenticated organization member",
+        "tags": [
+          "Policy"
+        ],
+        "parameters": [],
+        "operationId": "getActivePolicy",
+        "responses": {
+          "200": {
+            "description": "200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "gcsPath": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "ingesting",
+                        "active",
+                        "failed",
+                        "archived"
+                      ]
+                    },
+                    "chunkCount": {
+                      "type": "integer"
+                    },
+                    "uploadedBy": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "gcsPath",
+                    "version",
+                    "status",
+                    "chunkCount",
+                    "uploadedBy",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/policy": {
       "post": {
         "summary": "Upload a new expense policy PDF (org:admin only)",
         "tags": [
-          "Polcy"
+          "Policy"
         ],
         "parameters": [],
         "operationId": "uploadPolicy",
@@ -968,7 +1240,7 @@
       "get": {
         "summary": "List all policies (org:admin only)",
         "tags": [
-          "Polcy"
+          "Policy"
         ],
         "parameters": [],
         "operationId": "listPolicies",
@@ -1033,15 +1305,51 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
           }
         }
       }
     },
-    "/api/v1/admin/policy/{id}": {
+    "/v1/admin/policy/{id}": {
       "get": {
         "summary": "Get a policy by ID (org:admin only)",
         "tags": [
-          "Polcy"
+          "Policy"
         ],
         "parameters": [
           {
@@ -1114,8 +1422,171 @@
               }
             }
           },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
           "404": {
             "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/organization/invitations": {
+      "post": {
+        "summary": "Create an organization invitation",
+        "tags": [
+          "Organization"
+        ],
+        "parameters": [],
+        "operationId": "createInvitation",
+        "requestBody": {
+          "description": "Body",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "emailAddress": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "org:member",
+                      "org:admin"
+                    ]
+                  }
+                },
+                "required": [
+                  "emailAddress"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "201",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "emailAddress": {
+                      "type": "string",
+                      "format": "email"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "redirectUrl": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "emailAddress",
+                    "role",
+                    "status",
+                    "redirectUrl"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
             "content": {
               "application/json": {
                 "schema": {

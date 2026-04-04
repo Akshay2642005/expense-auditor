@@ -1,9 +1,9 @@
 import { useAuditApi } from "@/api/audit";
+import { useClaimsApi } from "@/api/claims";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { API_URL } from "@/config/env";
 import {
   formatOrganizationMemberLabel,
   useOrganizationMemberDirectory,
@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import type { ClaimResponse, AuditResponse } from "@auditor/zod";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import {
   AlertCircle,
   CheckCircle2,
@@ -125,19 +124,6 @@ const statusConfig: Record<
   },
 };
 
-async function fetchClaim(
-  id: string,
-  token: string | null,
-): Promise<ClaimResponse> {
-  const resp = await axios.get<ClaimResponse>(
-    `${API_URL}/api/v1/claims/${id}`,
-    {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    },
-  );
-  return resp.data;
-}
-
 export function ClaimStatusPage({
   routeMode,
 }: {
@@ -145,8 +131,9 @@ export function ClaimStatusPage({
 }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getToken, orgRole, isLoaded: authLoaded } = useAuth();
+  const { orgRole, isLoaded: authLoaded } = useAuth();
   const queryClient = useQueryClient();
+  const { getClaim, recomputePolicyMatch } = useClaimsApi();
   const authIsAdmin = orgRole === "org:admin";
   const isAdminView =
     routeMode === "admin"
@@ -169,10 +156,7 @@ export function ClaimStatusPage({
     isError,
   } = useQuery({
     queryKey: ["claim", id],
-    queryFn: async () => {
-      const token = await getToken();
-      return fetchClaim(id!, token);
-    },
+    queryFn: () => getClaim(id!),
     enabled: !!id && !memberRouteRedirect && !adminRouteRedirect,
     refetchInterval: (query) =>
       query.state.data && TERMINAL_STATUSES.has(query.state.data.status)
@@ -240,12 +224,7 @@ export function ClaimStatusPage({
     if (!claim) return;
     setRecomputeLoading(true);
     try {
-      const token = await getToken();
-      await axios.post(
-        `${API_URL}/api/v1/admin/claims/${claim.id}/recompute-policy`,
-        {},
-        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
-      );
+      await recomputePolicyMatch(claim.id);
       await queryClient.invalidateQueries({ queryKey: ["claim", id] });
       await queryClient.invalidateQueries({ queryKey: ["claims"] });
       toast.success("Policy match re-run");

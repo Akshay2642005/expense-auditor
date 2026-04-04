@@ -60,4 +60,18 @@ export const claimContract = c.router({
       404: ZErrorResponse,
     },
   },
+
+  recomputePolicy: {
+    summary: "Recompute policy matching for a claim",
+    method: "POST",
+    path: "/v1/admin/claims/:id/recompute-policy",
+    pathParams: z.object({ id: z.string().uuid() }),
+    body: z.object({}).optional(),
+    responses: {
+      200: ZClaimResponse,
+      401: ZErrorResponse,
+      403: ZErrorResponse,
+      404: ZErrorResponse,
+    },
+  },
 });

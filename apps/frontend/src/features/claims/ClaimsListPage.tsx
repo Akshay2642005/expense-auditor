@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { API_URL } from "@/config/env";
 import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 import {
   formatOrganizationMemberLabel,
@@ -56,7 +55,6 @@ import {
   useUser,
 } from "@clerk/clerk-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 import {
   CheckCircle2,
   Clock,
@@ -284,38 +282,6 @@ function compareAdminClaims(
   return left.id.localeCompare(right.id) * direction;
 }
 
-async function fetchClaims(token: string): Promise<ClaimResponse[]> {
-  const { data } = await axios.get<ClaimResponse[]>(
-    `${API_URL}/api/v1/claims`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
-  return data;
-}
-
-async function fetchClaim(id: string, token: string): Promise<ClaimResponse> {
-  const { data } = await axios.get<ClaimResponse>(
-    `${API_URL}/api/v1/claims/${id}`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
-  return data;
-}
-
-/** Resolves a non-null Clerk token. Only called when authLoaded=true so retries are short. */
-async function resolveToken(
-  getToken: () => Promise<string | null>,
-): Promise<string> {
-  for (let i = 0; i < 5; i++) {
-    const t = await getToken();
-    if (t) return t;
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error("Auth token unavailable");
-}
-
 // ─── Claim preview popover ────────────────────────────────────────────────────
 
 const HOVER_DELAY_MS = 600;
@@ -331,15 +297,12 @@ function ClaimPreview({
   uploaderLabel?: string;
   dateField: ClaimDateField;
 }) {
-  const { getToken } = useAuth();
+  const { getClaim } = useClaimsApi();
   const { getAudit } = useAuditApi();
 
   const { data: detail } = useQuery({
     queryKey: ["claim", claim.id],
-    queryFn: async () => {
-      const token = await resolveToken(getToken);
-      return fetchClaim(claim.id, token);
-    },
+    queryFn: () => getClaim(claim.id),
     staleTime: 5 * 60 * 1000,
     initialData: claim,
   });
@@ -481,7 +444,7 @@ function ClaimRow({
   dateField: ClaimDateField;
 }) {
   const queryClient = useQueryClient();
-  const { getToken } = useAuth();
+  const { getClaim } = useClaimsApi();
   const { getAudit } = useAuditApi();
 
   const [preview, setPreview] = useState<{ rect: DOMRect } | null>(null);
@@ -497,10 +460,7 @@ function ClaimRow({
   const prefetch = useCallback(() => {
     queryClient.prefetchQuery({
       queryKey: ["claim", claim.id],
-      queryFn: async () => {
-        const token = await resolveToken(getToken);
-        return fetchClaim(claim.id, token);
-      },
+      queryFn: () => getClaim(claim.id),
       staleTime: 5 * 60 * 1000,
     });
     if (isAudited) {
@@ -510,7 +470,7 @@ function ClaimRow({
         staleTime: 5 * 60 * 1000,
       });
     }
-  }, [claim.id, isAudited, queryClient, getToken, getAudit]);
+  }, [claim.id, isAudited, queryClient, getClaim, getAudit]);
 
   const handleMouseEnter = () => {
     prefetch();
@@ -886,10 +846,10 @@ export function ClaimsListPage({
 }) {
   const navigate = useNavigate();
   const { user } = useUser();
-  const { getToken, orgRole, isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { orgRole, isLoaded: authLoaded, isSignedIn } = useAuth();
   const { organization } = useOrganization();
   const { signOut } = useClerk();
-  const { listAdminClaims } = useClaimsApi();
+  const { listClaims, listAdminClaims } = useClaimsApi();
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -946,8 +906,7 @@ export function ClaimsListPage({
         return listAdminClaims();
       }
 
-      const token = await resolveToken(getToken);
-      return fetchClaims(token);
+      return listClaims();
     },
     enabled: claimsQueryEnabled,
     staleTime: 2 * 60 * 1000,
