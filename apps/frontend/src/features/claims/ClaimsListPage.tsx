@@ -81,7 +81,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 // ─── status meta ──────────────────────────────────────────────────────────────
@@ -158,6 +158,7 @@ const adminStatusFilterOptions: ClaimStatus[] = [
 ];
 
 type ClaimDateField = AdminClaimDateField;
+type ClaimsPageRouteMode = "member" | "admin";
 type UploaderOption = {
   userId: string;
   label: string;
@@ -878,7 +879,11 @@ function AdminFiltersPanel({
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export function ClaimsListPage() {
+export function ClaimsListPage({
+  routeMode,
+}: {
+  routeMode?: ClaimsPageRouteMode;
+}) {
   const navigate = useNavigate();
   const { user } = useUser();
   const { getToken, orgRole, isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -908,7 +913,15 @@ export function ClaimsListPage() {
     isReady: isActiveOrgReady,
     isWaitingForActivation: isWaitingForActiveOrg,
   } = useActiveOrganizationReady();
-  const isAdminView = orgRole === "org:admin";
+  const authIsAdmin = orgRole === "org:admin";
+  const isAdminView =
+    routeMode === "admin"
+      ? true
+      : routeMode === "member"
+        ? false
+        : authIsAdmin;
+  const memberRouteRedirect = authLoaded && routeMode === "member" && authIsAdmin;
+  const adminRouteRedirect = authLoaded && routeMode === "admin" && !authIsAdmin;
   const { memberDirectory } = useOrganizationMemberDirectory(isAdminView);
   const deferredAdminSearchText = useDeferredValue(adminSearchText.trim());
 
@@ -916,7 +929,11 @@ export function ClaimsListPage() {
   // resolveToken retries up to 5× with 200ms gaps, covering the brief window after
   // refresh where isLoaded=true but the JWT isn't minted yet.
   const queryEnabled = authLoaded && isSignedIn === true;
-  const claimsQueryEnabled = queryEnabled && !isWaitingForActiveOrg;
+  const claimsQueryEnabled =
+    queryEnabled &&
+    !isWaitingForActiveOrg &&
+    !memberRouteRedirect &&
+    !adminRouteRedirect;
 
   const {
     data: claims,
@@ -1075,6 +1092,7 @@ export function ClaimsListPage() {
 
   const policyPath = orgRole === "org:admin" ? "/admin/policy" : "/policy";
   const policyLabel = orgRole === "org:admin" ? "Policy Admin" : "Policy";
+  const profilePath = isAdminView ? "/admin/profile" : "/profile";
   const claimsHeading = isAdminView ? "Claims To Review" : "My Claims";
   const claimsEmptyTitle = isAdminView
     ? activeFilterCount > 0
@@ -1091,6 +1109,14 @@ export function ClaimsListPage() {
     isWaitingForActiveOrg ||
     (isLoading && rawClaims.length === 0);
   const pageShellWidthClassName = isAdminView ? "max-w-7xl" : "max-w-3xl";
+
+  if (memberRouteRedirect) {
+    return <Navigate to="/admin/claims" replace />;
+  }
+
+  if (adminRouteRedirect) {
+    return <Navigate to="/claims" replace />;
+  }
 
   useEffect(() => {
     if (!isAdminView || typeof window === "undefined") {
@@ -1173,7 +1199,13 @@ export function ClaimsListPage() {
                 claim={claim}
                 isAdminView={isAdminView}
                 dateField={isAdminView ? dateField : "claimed"}
-                onClick={() => navigate(`/claims/${claim.id}`)}
+                onClick={() =>
+                  navigate(
+                    isAdminView
+                      ? `/admin/claims/${claim.id}`
+                      : `/claims/${claim.id}`,
+                  )
+                }
                 uploaderLabel={isAdminView ? uploaderLabel : undefined}
               />
             );
@@ -1289,7 +1321,7 @@ export function ClaimsListPage() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/profile")}>
+                <DropdownMenuItem onClick={() => navigate(profilePath)}>
                   <User className="mr-2 h-4 w-4" />
                   Profile
                 </DropdownMenuItem>

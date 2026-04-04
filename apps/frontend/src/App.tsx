@@ -10,6 +10,8 @@ import { SSOCallbackPage } from "@/features/auth/SSOCallbackPage.tsx";
 import { ProfilePage } from "@/features/auth/ProfilePage.tsx";
 import { CreateOrgPage } from "@/features/auth/CreateOrgPage.tsx";
 import { AcceptInvitationPage } from "@/features/auth/AcceptInvitationPage.tsx";
+import { AdminClaimReviewPage } from "@/features/claims/AdminClaimReviewPage.tsx";
+import { AdminClaimsPage } from "@/features/claims/AdminClaimsPage.tsx";
 import { SubmitClaimPage } from "@/features/claims/SubmitClaimPage.tsx";
 import { ClaimStatusPage } from "@/features/claims/ClaimStatusPage.tsx";
 import { ClaimsListPage } from "@/features/claims/ClaimsListPage.tsx";
@@ -53,6 +55,30 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function HomeRedirect() {
+  const { isLoaded: authLoaded, orgRole } = useAuth();
+
+  if (!authLoaded) return <Spinner />;
+
+  return (
+    <Navigate
+      to={orgRole === "org:admin" ? "/admin/claims" : "/claims"}
+      replace
+    />
+  );
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded, orgRole } = useAuth();
+
+  if (!userLoaded || !authLoaded) return <Spinner />;
+  if (!isSignedIn) return <Navigate to="/login" replace />;
+  if (orgRole !== "org:admin") return <Navigate to="/claims" replace />;
+
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <>
@@ -64,10 +90,14 @@ export default function App() {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/sso-callback" element={<SSOCallbackPage />} />
         <Route path="/create-org" element={<ProtectedRoute><CreateOrgPage /></ProtectedRoute>} />
-        <Route path="/" element={<ProtectedRoute><ClaimsListPage /></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><HomeRedirect /></ProtectedRoute>} />
+        <Route path="/claims" element={<ProtectedRoute><ClaimsListPage routeMode="member" /></ProtectedRoute>} />
+        <Route path="/admin/claims" element={<AdminRoute><AdminClaimsPage /></AdminRoute>} />
+        <Route path="/admin/claims/:id" element={<AdminRoute><AdminClaimReviewPage /></AdminRoute>} />
         <Route path="/claims/new" element={<ProtectedRoute><SubmitClaimPage /></ProtectedRoute>} />
-        <Route path="/claims/:id" element={<ProtectedRoute><ClaimStatusPage /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/claims/:id" element={<ProtectedRoute><ClaimStatusPage routeMode="member" /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage routeMode="member" /></ProtectedRoute>} />
+        <Route path="/admin/profile" element={<AdminRoute><ProfilePage routeMode="admin" /></AdminRoute>} />
         <Route path="/admin/policy" element={<PolicyAdminPage />} />
         <Route path="/policy" element={<ProtectedRoute><PolicyPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

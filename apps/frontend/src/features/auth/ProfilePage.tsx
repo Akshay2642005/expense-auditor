@@ -1,7 +1,7 @@
-import { useClerk, useOrganization, useOrganizationList, useUser } from "@clerk/clerk-react";
+import { useAuth, useClerk, useOrganization, useOrganizationList, useUser } from "@clerk/clerk-react";
 import { AlertTriangle, ArrowLeft, Building2, Camera, LogOut, Mail, Plus, ShieldCheck, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -21,8 +21,13 @@ function initials(first?: string | null, last?: string | null) {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
 }
 
-export function ProfilePage() {
+export function ProfilePage({
+  routeMode,
+}: {
+  routeMode?: "member" | "admin";
+}) {
   const { user, isLoaded } = useUser();
+  const { orgRole, isLoaded: authLoaded } = useAuth();
   const { signOut } = useClerk();
   const { organization, membership } = useOrganization();
   const { userMemberships, createOrganization, setActive, isLoaded: orgListLoaded } = useOrganizationList({
@@ -41,7 +46,17 @@ export function ProfilePage() {
   const [creatingOrg, setCreatingOrg] = useState(false);
   const { createInvitation } = useOrganizationApi();
 
+  const authIsAdmin = orgRole === "org:admin";
   const isAdmin = membership?.role === "org:admin";
+  const isAdminView =
+    routeMode === "admin"
+      ? true
+      : routeMode === "member"
+        ? false
+        : authIsAdmin;
+  const memberRouteRedirect = authLoaded && routeMode === "member" && authIsAdmin;
+  const adminRouteRedirect = authLoaded && routeMode === "admin" && !authIsAdmin;
+  const backPath = isAdminView ? "/admin/claims" : "/claims";
 
   useEffect(() => {
     if (user) {
@@ -50,7 +65,15 @@ export function ProfilePage() {
     }
   }, [user]);
 
-  if (!isLoaded || !user) return null;
+  if (memberRouteRedirect) {
+    return <Navigate to="/admin/profile" replace />;
+  }
+
+  if (adminRouteRedirect) {
+    return <Navigate to="/profile" replace />;
+  }
+
+  if (!isLoaded || !authLoaded || !user) return null;
 
   const isDirty =
     firstName.trim() !== (user.firstName ?? "") ||
@@ -137,7 +160,7 @@ export function ProfilePage() {
 
         {/* Top nav */}
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => navigate("/")}>
+          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => navigate(backPath)}>
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>

@@ -196,7 +196,11 @@ export function SubmitClaimPage() {
     return (
       <div className="min-h-screen bg-background p-4 sm:p-8">
         <div className="mx-auto max-w-xl space-y-6">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/claims")}
+          >
             ← Back to Review Queue
           </Button>
 
@@ -212,7 +216,9 @@ export function SubmitClaimPage() {
                   cannot upload reimbursement claims themselves.
                 </p>
               </div>
-              <Button onClick={() => navigate("/")}>Go to Claims Review</Button>
+              <Button onClick={() => navigate("/admin/claims")}>
+                Go to Claims Review
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -224,7 +230,7 @@ export function SubmitClaimPage() {
     return (
       <div className="min-h-screen bg-background p-4 sm:p-8">
         <div className="mx-auto max-w-xl space-y-6">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("/claims")}>
             ← Back
           </Button>
 
@@ -240,7 +246,7 @@ export function SubmitClaimPage() {
                   so the claim can be audited against the correct policy.
                 </p>
               </div>
-              <Button onClick={() => navigate("/")}>Back to Home</Button>
+              <Button onClick={() => navigate("/claims")}>Back to Claims</Button>
             </CardContent>
           </Card>
         </div>

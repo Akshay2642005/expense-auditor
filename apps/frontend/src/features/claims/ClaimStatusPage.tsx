@@ -25,7 +25,7 @@ import {
   Quote,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 /**
@@ -138,13 +138,27 @@ async function fetchClaim(
   return resp.data;
 }
 
-export function ClaimStatusPage() {
+export function ClaimStatusPage({
+  routeMode,
+}: {
+  routeMode?: "member" | "admin";
+}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getToken, orgRole } = useAuth();
+  const { getToken, orgRole, isLoaded: authLoaded } = useAuth();
   const queryClient = useQueryClient();
-  const isAdminView = orgRole === "org:admin";
+  const authIsAdmin = orgRole === "org:admin";
+  const isAdminView =
+    routeMode === "admin"
+      ? true
+      : routeMode === "member"
+        ? false
+        : authIsAdmin;
+  const memberRouteRedirect = authLoaded && routeMode === "member" && authIsAdmin;
+  const adminRouteRedirect = authLoaded && routeMode === "admin" && !authIsAdmin;
   const { memberDirectory } = useOrganizationMemberDirectory(isAdminView);
+  const backPath = isAdminView ? "/admin/claims" : "/claims";
+  const backLabel = isAdminView ? "Review Queue" : "All Claims";
 
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [recomputeLoading, setRecomputeLoading] = useState(false);
@@ -159,7 +173,7 @@ export function ClaimStatusPage() {
       const token = await getToken();
       return fetchClaim(id!, token);
     },
-    enabled: !!id,
+    enabled: !!id && !memberRouteRedirect && !adminRouteRedirect,
     refetchInterval: (query) =>
       query.state.data && TERMINAL_STATUSES.has(query.state.data.status)
         ? false
@@ -181,12 +195,22 @@ export function ClaimStatusPage() {
       return getAudit(id!, signal);
     },
     enabled:
+      !memberRouteRedirect &&
+      !adminRouteRedirect &&
       !!claim && ["approved", "flagged", "rejected"].includes(claim.status),
     refetchInterval: (query) => (query.state.data ? false : POLL_INTERVAL_MS),
   });
 
   // Cast to ExtendedAudit so we can safely render optional diagnostic fields
   const extAudit = audit as ExtendedAudit | null;
+
+  if (memberRouteRedirect) {
+    return <Navigate to={id ? `/admin/claims/${id}` : "/admin/claims"} replace />;
+  }
+
+  if (adminRouteRedirect) {
+    return <Navigate to={id ? `/claims/${id}` : "/claims"} replace />;
+  }
 
   // Authenticated receipt viewer — uses downloadReceipt helper to fetch blob and open it
   const handleViewReceipt = async () => {
@@ -252,7 +276,7 @@ export function ClaimStatusPage() {
           <CardContent className="flex flex-col items-center gap-4 py-8 text-center">
             <AlertCircle className="h-10 w-10 text-destructive" />
             <p className="font-medium">Could not load this claim</p>
-            <Button variant="outline" onClick={() => navigate("/")}>
+            <Button variant="outline" onClick={() => navigate(backPath)}>
               Back to Claims
             </Button>
           </CardContent>
@@ -268,7 +292,6 @@ export function ClaimStatusPage() {
     claim.status === "ocr_failed"
       ? "bg-destructive/10 text-destructive"
       : "bg-amber-500/10 text-amber-700 dark:text-amber-300";
-  const backLabel = isAdminView ? "Review Queue" : "All Claims";
   const submissionLabel = isAdminView
     ? "Employee Submission"
     : "Your Submission";
@@ -280,7 +303,7 @@ export function ClaimStatusPage() {
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
       <div className="mx-auto max-w-2xl space-y-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(backPath)}>
           ← {backLabel}
         </Button>
 
