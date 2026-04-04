@@ -22,10 +22,22 @@ type JobService struct {
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 	redisAddr := cfg.Redis.Address
 
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})
+	redisConn, err := asynq.ParseRedisURI(redisAddr)
+	if err != nil {
+		var fallbackErr error
+		redisConn, fallbackErr = asynq.ParseRedisURI("redis://" + redisAddr)
+		if fallbackErr != nil {
+			logger.Fatal().
+				Err(err).
+				Str("addr", redisAddr).
+				Msg("failed to parse redis connection string")
+		}
+	}
+
+	client := asynq.NewClient(redisConn)
 
 	server := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		redisConn,
 		asynq.Config{
 			Concurrency: 10,
 			Queues: map[string]int{
