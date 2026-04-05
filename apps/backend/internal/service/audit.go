@@ -96,11 +96,7 @@ func (s *AuditService) SaveJobAuditDecision(
 	aiModel string,
 	deterministicRule *string,
 ) error {
-	if err := s.repos.Audit.SaveDecision(ctx, claimID, decision, reason, citedPolicyText, confidence, aiModel, deterministicRule, nil); err != nil {
-		return err
-	}
-	s.invalidateClaimCaches(ctx, claimID)
-	return nil
+	return s.saveJobAuditDecision(ctx, claimID, decision, reason, citedPolicyText, confidence, aiModel, deterministicRule, nil)
 }
 
 func (s *AuditService) SaveJobAuditDecisionWithRaw(
@@ -114,9 +110,39 @@ func (s *AuditService) SaveJobAuditDecisionWithRaw(
 	deterministicRule *string,
 	rawModelOutput *string,
 ) error {
+	return s.saveJobAuditDecision(ctx, claimID, decision, reason, citedPolicyText, confidence, aiModel, deterministicRule, rawModelOutput)
+}
+
+func (s *AuditService) saveJobAuditDecision(
+	ctx context.Context,
+	claimID uuid.UUID,
+	decision model.AuditDecisionStatus,
+	reason string,
+	citedPolicyText *string,
+	confidence float64,
+	aiModel string,
+	deterministicRule *string,
+	rawModelOutput *string,
+) error {
+	previousClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		return err
+	}
+
 	if err := s.repos.Audit.SaveDecision(ctx, claimID, decision, reason, citedPolicyText, confidence, aiModel, deterministicRule, rawModelOutput); err != nil {
 		return err
 	}
+
+	updatedClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		s.server.Logger.Warn().
+			Err(err).
+			Str("claim_id", claimID.String()).
+			Msg("failed to reload claim after saving audit decision")
+	} else {
+		enqueueClaimOutcomeNotification(ctx, s.server.Logger, s.job, previousClaim, updatedClaim, reason)
+	}
+
 	s.invalidateClaimCaches(ctx, claimID)
 	return nil
 }
@@ -165,6 +191,16 @@ func (s *AuditService) OverrideClaimDecision(
 		citedPolicyText,
 	); err != nil {
 		return err
+	}
+
+	updatedClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		s.server.Logger.Warn().
+			Err(err).
+			Str("claim_id", claimID.String()).
+			Msg("failed to reload claim after saving audit override")
+	} else {
+		enqueueClaimOutcomeNotification(ctx, s.server.Logger, s.job, claim, updatedClaim, trimmedReason)
 	}
 
 	s.invalidateClaimCaches(ctx, claimID)

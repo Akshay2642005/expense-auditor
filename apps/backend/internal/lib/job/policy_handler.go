@@ -140,34 +140,43 @@ func (j *JobService) retrieveAndSavePolicy(ctx context.Context, claimID uuid.UUI
 	}
 
 	nextStatus := model.ClaimStatusPolicyMatched
+	var notificationReason *string
 	if claim.Amount != nil {
 		switch string(claim.ExpenseCategory) {
 		case string(model.ExpenseCategoryMeals):
 			if mealsCap != nil && *claim.Amount > *mealsCap {
 				nextStatus = model.ClaimStatusFlagged
+				reason := "This meals claim exceeded the active policy limit and now needs clarification."
+				notificationReason = &reason
 				log.Info().
 					Float64("amount", *claim.Amount).
 					Float64("cap", *mealsCap).
 					Msg("meals expense exceeds policy cap; flagging")
 			} else if mealsCap == nil {
 				nextStatus = model.ClaimStatusNeedsReview
+				reason := "We could not confirm the active meals limit from the policy, so this claim needs clarification."
+				notificationReason = &reason
 				log.Info().Msg("meals cap not found in policy text; marking as needs_review")
 			}
 		case string(model.ExpenseCategoryLodging):
 			if lodgingCap != nil && *claim.Amount > *lodgingCap {
 				nextStatus = model.ClaimStatusFlagged
+				reason := "This lodging claim exceeded the active policy limit and now needs clarification."
+				notificationReason = &reason
 				log.Info().
 					Float64("amount", *claim.Amount).
 					Float64("cap", *lodgingCap).
 					Msg("lodging expense exceeds policy cap; flagging")
 			} else if lodgingCap == nil {
 				nextStatus = model.ClaimStatusNeedsReview
+				reason := "We could not confirm the active lodging limit from the policy, so this claim needs clarification."
+				notificationReason = &reason
 				log.Info().Msg("lodging cap not found in policy text; marking as needs_review")
 			}
 		}
 	}
 
-	if err := j.claimService.SaveClaimPolicyMatch(ctx, claimID, policyID, retrieved, nextStatus); err != nil {
+	if err := j.claimService.SaveClaimPolicyMatch(ctx, claimID, policyID, retrieved, nextStatus, notificationReason); err != nil {
 		return fmt.Errorf("save policy match: %w", err)
 	}
 

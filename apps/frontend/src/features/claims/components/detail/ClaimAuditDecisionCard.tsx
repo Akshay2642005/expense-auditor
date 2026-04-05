@@ -22,6 +22,7 @@ export function ClaimAuditDecisionCard({
   memberDirectory,
   policyReference,
   policyId,
+  hasMatchedPolicyEvidence,
   claimStatusLabel,
   claimStatusClassName,
 }: {
@@ -33,6 +34,7 @@ export function ClaimAuditDecisionCard({
   memberDirectory: Record<string, OrganizationMemberDirectoryEntry>;
   policyReference: string | null;
   policyId: string | null;
+  hasMatchedPolicyEvidence: boolean;
   claimStatusLabel: string;
   claimStatusClassName: string;
 }) {
@@ -159,7 +161,11 @@ export function ClaimAuditDecisionCard({
                     label="Policy Match"
                     value={
                       policyReference ??
-                      (policyId ? compactId(policyId) : "No linked policy")
+                      (policyId
+                        ? compactId(policyId)
+                        : hasMatchedPolicyEvidence
+                          ? "Matched policy attached"
+                          : "No linked policy")
                     }
                   />
                   <DetailRow

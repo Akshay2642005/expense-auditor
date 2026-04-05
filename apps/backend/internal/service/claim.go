@@ -567,6 +567,11 @@ func (s *ClaimService) SaveClaimOCRResult(
 	dateMismatch bool,
 	reviewReason *string,
 ) error {
+	previousClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		return err
+	}
+
 	var merchantName *string
 	if result.MerchantName != "" {
 		merchantName = &result.MerchantName
@@ -597,6 +602,24 @@ func (s *ClaimService) SaveClaimOCRResult(
 	); err != nil {
 		return err
 	}
+
+	updatedClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		s.server.Logger.Warn().
+			Err(err).
+			Str("claim_id", claimID.String()).
+			Msg("failed to reload claim after saving OCR result")
+	} else {
+		enqueueClaimOutcomeNotification(
+			ctx,
+			s.server.Logger,
+			s.job,
+			previousClaim,
+			updatedClaim,
+			claimOCROutcomeReason(status, dateMismatch, reviewReason),
+		)
+	}
+
 	s.invalidateClaimCaches(ctx, claimID)
 	return nil
 }
@@ -611,7 +634,13 @@ func (s *ClaimService) SaveClaimPolicyMatch(
 	policyID uuid.UUID,
 	chunks []model.RetrievedChunk,
 	status model.ClaimStatus,
+	notificationReason *string,
 ) error {
+	previousClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		return err
+	}
+
 	raw, err := model.MarshalRetrievedChunks(chunks)
 	if err != nil {
 		return err
@@ -619,6 +648,24 @@ func (s *ClaimService) SaveClaimPolicyMatch(
 	if err := s.repos.Claim.SavePolicyMatch(ctx, claimID, policyID, raw, status); err != nil {
 		return err
 	}
+
+	updatedClaim, err := s.repos.Claim.GetClaimByID(ctx, claimID)
+	if err != nil {
+		s.server.Logger.Warn().
+			Err(err).
+			Str("claim_id", claimID.String()).
+			Msg("failed to reload claim after saving policy match")
+	} else {
+		enqueueClaimOutcomeNotification(
+			ctx,
+			s.server.Logger,
+			s.job,
+			previousClaim,
+			updatedClaim,
+			claimPolicyOutcomeReason(status, notificationReason),
+		)
+	}
+
 	s.invalidateClaimCaches(ctx, claimID)
 	return nil
 }

@@ -9,8 +9,10 @@ import type {
   ClaimStatus,
   SubmitClaimResponse,
 } from "@auditor/zod";
+import axios from "axios";
 import { useCallback, useMemo } from "react";
-import { getApiErrorMessage, useApiClient } from "@/api/index";
+import { API_URL } from "@/config/env";
+import { getApiErrorMessage, useApiClient, useAuthHeaders } from "@/api/index";
 
 export interface SubmitClaimPayload {
   file: File;
@@ -35,6 +37,7 @@ export interface AdminClaimsQuery {
 
 export function useClaimsApi() {
   const api = useApiClient();
+  const getHeaders = useAuthHeaders();
 
   const toAdminClaimsQuery = useCallback(
     (query?: AdminClaimsQuery) => ({
@@ -60,16 +63,31 @@ export function useClaimsApi() {
     form.append("claimed_date", payload.claimedDate);
     form.append("expense_category", payload.expenseCategory);
 
-    const response = await api.Claim.submitClaim({
-      body: form,
-    });
+    try {
+      const headers = await getHeaders();
+      const response = await axios.post<SubmitClaimResult>(
+        `${API_URL}/api/v1/claims`,
+        form,
+        { headers },
+      );
 
-    if (response.status === 202) {
-      return response.body;
+      if (response.status === 202) {
+        return response.data;
+      }
+
+      throw new Error("Submission failed");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        throw new Error(
+          getApiErrorMessage(error.response?.data, "Submission failed"),
+        );
+      }
+
+      throw error instanceof Error
+        ? error
+        : new Error("Submission failed");
     }
-
-    throw new Error(getApiErrorMessage(response.body, "Submission failed"));
-  }, [api]);
+  }, [getHeaders]);
 
   const listClaims = useCallback(async (): Promise<ClaimResponse[]> => {
     const response = await api.Claim.listClaims();

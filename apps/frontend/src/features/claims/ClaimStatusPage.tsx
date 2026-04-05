@@ -330,6 +330,11 @@ export function ClaimStatusPage({
     receiptPreviewMimeType.startsWith("image/");
   const latestAutomatedAudit =
     auditHistory.find((entry) => !isManualAuditDecision(entry)) ?? null;
+  const hasMatchedPolicyEvidence = Boolean(
+    policyChunks.length > 0 ||
+      extAudit?.citedPolicyText?.trim() ||
+      latestAutomatedAudit?.citedPolicyText?.trim(),
+  );
   const headlineTitle =
     claim.merchantName?.trim() ||
     (isAdminView ? "Claim Review Workspace" : "Expense Claim");
@@ -396,6 +401,7 @@ export function ClaimStatusPage({
       memberDirectory={memberDirectory}
       policyReference={policyReference}
       policyId={policyId}
+      hasMatchedPolicyEvidence={hasMatchedPolicyEvidence}
       claimStatusLabel={cfg.label}
       claimStatusClassName={cfg.color}
     />

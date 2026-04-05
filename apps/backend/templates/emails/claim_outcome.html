@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
+  <head>
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+  </head>
+  <body
+    style='background-color:rgb(243,244,246);font-family:ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";margin:0;padding:24px'>
+    <table
+      align="center"
+      width="100%"
+      border="0"
+      cellpadding="0"
+      cellspacing="0"
+      role="presentation"
+      style="background-color:rgb(255,255,255);padding:32px;border-radius:16px;box-shadow:0 1px 2px 0 rgb(0,0,0,0.05);margin:0 auto;max-width:640px">
+      <tbody>
+        <tr style="width:100%">
+          <td>
+            <p
+              style="margin:0 0 12px 0;font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgb(107,114,128)">
+              Expense Auditor
+            </p>
+            <h1
+              style="margin:0 0 16px 0;font-size:28px;line-height:36px;font-weight:700;color:rgb(17,24,39)">
+              {{.OutcomeTitle}}
+            </h1>
+            <p
+              style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:rgb(55,65,81)">
+              Hi {{.RecipientName}},
+            </p>
+            <p
+              style="margin:0 0 24px 0;font-size:16px;line-height:26px;color:rgb(55,65,81)">
+              {{.OutcomeSummary}}
+            </p>
+
+            <table
+              width="100%"
+              border="0"
+              cellpadding="0"
+              cellspacing="0"
+              role="presentation"
+              style="margin:0 0 24px 0;border:1px solid rgb(229,231,235);border-radius:14px;background-color:rgb(249,250,251)">
+              <tbody>
+                <tr>
+                  <td style="padding:20px">
+                    <p
+                      style="margin:0 0 8px 0;font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgb(107,114,128)">
+                      Claim
+                    </p>
+                    <p
+                      style="margin:0 0 6px 0;font-size:22px;line-height:30px;font-weight:700;color:rgb(17,24,39)">
+                      {{.ClaimLabel}}
+                    </p>
+                    <p
+                      style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:rgb(75,85,99)">
+                      Claim ID: {{.ClaimID}}
+                    </p>
+                    <p
+                      style="display:inline-block;margin:0 0 16px 0;padding:6px 12px;border-radius:999px;background-color:rgb(17,24,39);font-size:13px;line-height:18px;font-weight:600;color:rgb(255,255,255)">
+                      {{.OutcomeLabel}}
+                    </p>
+                    <p
+                      style="margin:0;font-size:15px;line-height:24px;color:rgb(31,41,55)">
+                      Amount: {{.ClaimAmount}}
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <table
+              width="100%"
+              border="0"
+              cellpadding="0"
+              cellspacing="0"
+              role="presentation"
+              style="margin:0 0 28px 0;border-left:4px solid rgb(16,185,129);background-color:rgb(240,253,244);border-radius:12px">
+              <tbody>
+                <tr>
+                  <td style="padding:18px 20px">
+                    <p
+                      style="margin:0 0 8px 0;font-size:12px;line-height:18px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgb(22,101,52)">
+                      Review Note
+                    </p>
+                    <p
+                      style="margin:0;font-size:15px;line-height:24px;color:rgb(20,83,45)">
+                      {{.Reason}}
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {{if .ClaimURL}}
+            <table
+              align="center"
+              width="100%"
+              border="0"
+              cellpadding="0"
+              cellspacing="0"
+              role="presentation"
+              style="margin:0 0 24px 0;text-align:center">
+              <tbody>
+                <tr>
+                  <td>
+                    <a
+                      href="{{.ClaimURL}}"
+                      style="background-color:rgb(17,24,39);color:rgb(255,255,255);font-weight:600;border-radius:12px;padding:14px 24px;line-height:100%;text-decoration:none;display:inline-block;max-width:100%"
+                      target="_blank">
+                      <span style="display:inline-block;line-height:120%">{{.CTA}}</span>
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {{end}}
+
+            <p
+              style="margin:0;font-size:13px;line-height:22px;color:rgb(107,114,128)">
+              You are receiving this message because your expense claim reached a review milestone in Expense Auditor.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>

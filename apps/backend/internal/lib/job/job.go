@@ -13,6 +13,7 @@ type JobService struct {
 	Client *asynq.Client
 	server *asynq.Server
 	logger *zerolog.Logger
+	cfg    *config.Config
 
 	claimService  ClaimJobService
 	policyService PolicyJobService
@@ -42,6 +43,7 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 			Concurrency: 10,
 			Queues: map[string]int{
 				"critical": 6,
+				"email":    2,
 				"default":  3,
 				"low":      1,
 			},
@@ -52,6 +54,7 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 		Client: client,
 		server: server,
 		logger: logger,
+		cfg:    cfg,
 	}
 }
 

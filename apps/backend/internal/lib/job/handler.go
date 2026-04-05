@@ -13,6 +13,7 @@ import (
 	"github.com/Akshay2642005/expense-auditor/internal/lib/gemini"
 	"github.com/Akshay2642005/expense-auditor/internal/lib/storage"
 	"github.com/Akshay2642005/expense-auditor/internal/model"
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/google/uuid"
 )
 
@@ -39,7 +40,7 @@ type ClaimJobService interface {
 	MarkClaimOCRFailed(ctx context.Context, claimID uuid.UUID, reason string) error
 	SaveClaimOCRResult(ctx context.Context, claimID uuid.UUID, result *gemini.OCRResult, status model.ClaimStatus, dateMismatch bool, reviewReason *string) error
 	GetClaimForJob(ctx context.Context, claimID uuid.UUID) (*model.Claim, error)
-	SaveClaimPolicyMatch(ctx context.Context, claimID uuid.UUID, policyID uuid.UUID, chunks []model.RetrievedChunk, status model.ClaimStatus) error
+	SaveClaimPolicyMatch(ctx context.Context, claimID uuid.UUID, policyID uuid.UUID, chunks []model.RetrievedChunk, status model.ClaimStatus, notificationReason *string) error
 	SetClaimOrgID(ctx context.Context, claimID uuid.UUID, orgID string) error
 }
 
@@ -78,6 +79,7 @@ type AuditJobService interface {
 
 func (j *JobService) InitHandlers(cfg *config.Config, logger *zerolog.Logger) {
 	emailClient = email.NewClient(cfg, logger)
+	clerk.SetKey(cfg.Auth.SecretKey)
 }
 
 func (j *JobService) InitOCRHandlers(g *gemini.Client, gcs *storage.GCSClient, dateMismatchDays int) {
@@ -107,4 +109,6 @@ func (j *JobService) registerHandlers(mux *asynq.ServeMux) {
 	mux.HandleFunc(TaskOCRReceipt, j.handleOCRReceiptTask)
 	mux.HandleFunc(TaskPolicyIngestion, j.handlePolicyIngestionTask)
 	mux.HandleFunc(TaskAuditClaim, j.handleAuditTask)
+	mux.HandleFunc(TaskWelcome, j.handleWelcomeEmailTask)
+	mux.HandleFunc(TaskClaimOutcome, j.handleClaimOutcomeEmailTask)
 }
