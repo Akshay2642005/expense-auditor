@@ -16,12 +16,14 @@ import (
 type Client struct {
 	client *resend.Client
 	logger *zerolog.Logger
+	from   string
 }
 
 func NewClient(cfg *config.Config, logger *zerolog.Logger) *Client {
 	return &Client{
 		client: resend.NewClient(cfg.Integration.ResendAPIKey),
 		logger: logger,
+		from:   cfg.Integration.ResendFrom,
 	}
 }
 
@@ -42,7 +44,7 @@ func (c *Client) SendEmail(to, subject string, templateName Template, data map[s
 	}
 
 	params := &resend.SendEmailRequest{
-		From:    fmt.Sprintf("%s <%s>", "expense-auditor", "onboarding@resend.dev"),
+		From:    fmt.Sprintf("Expense Auditor <%s>", c.from),
 		To:      []string{to},
 		Subject: subject,
 		Html:    body.String(),

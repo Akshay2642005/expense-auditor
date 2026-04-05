@@ -139,6 +139,7 @@ EXPAU_REDIS.ADDRESS="localhost:16316"
 
 EXPAU_AUTH.SECRET_KEY="your-clerk-secret-key"
 EXPAU_INTEGRATION.RESEND_API_KEY="your-resend-api-key"
+EXPAU_INTEGRATION.RESEND_FROM="Expense Auditor <onboarding@your-domain.com>"
 
 EXPAU_AI.GEMINI_API_KEY="your-gemini-api-key"
 EXPAU_AI.DATE_MISMATCH_THRESHOLD="7"
