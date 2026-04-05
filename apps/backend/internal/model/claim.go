@@ -71,6 +71,7 @@ type AdminClaimPolicyChunk struct {
 type AdminClaimDetail struct {
 	Claim        *Claim                  `json:"claim"`
 	Audit        *AuditDecision          `json:"audit"`
+	AuditHistory []AuditDecision         `json:"auditHistory"`
 	PolicyID     *uuid.UUID              `json:"policyId"`
 	PolicyChunks []AdminClaimPolicyChunk `json:"policyChunks"`
 }

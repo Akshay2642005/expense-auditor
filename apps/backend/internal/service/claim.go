@@ -353,13 +353,14 @@ func (s *ClaimService) GetAdminClaimDetail(
 		return nil, errs.NewForbiddenError("access denied", false)
 	}
 
+	auditHistory, err := s.repos.Audit.ListByClaimID(ctx, claimID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("failed to get audit history: %w", err)
+	}
+
 	var audit *model.AuditDecision
-	audit, err = s.repos.Audit.GetByClaimID(ctx, claimID)
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("failed to get audit decision: %w", err)
-		}
-		audit = nil
+	if len(auditHistory) > 0 {
+		audit = &auditHistory[0]
 	}
 
 	rawChunks, err := model.UnmarshalRetrievedChunks(claim.PolicyChunksUsed)
@@ -380,6 +381,7 @@ func (s *ClaimService) GetAdminClaimDetail(
 	return &model.AdminClaimDetail{
 		Claim:        claim,
 		Audit:        audit,
+		AuditHistory: auditHistory,
 		PolicyID:     claim.PolicyID,
 		PolicyChunks: policyChunks,
 	}, nil

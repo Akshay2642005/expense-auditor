@@ -81,6 +81,7 @@ export const ZAdminClaimPolicyChunkResponse = z.object({
 export const ZAdminClaimDetailResponse = z.object({
   claim: ZClaimResponse,
   audit: ZAuditResponse.nullable(),
+  auditHistory: z.array(ZAuditResponse),
   policyId: z.string().uuid().nullable(),
   policyChunks: z.array(ZAdminClaimPolicyChunkResponse),
 });

@@ -42,6 +42,27 @@ func (r *AuditRepository) GetByClaimID(ctx context.Context, claimID uuid.UUID) (
 	return &result, nil
 }
 
+func (r *AuditRepository) ListByClaimID(ctx context.Context, claimID uuid.UUID) ([]model.AuditDecision, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, claim_id, decision, reason, cited_policy_text,
+		       confidence, ai_model, deterministic_rule,
+		       overridden_by, override_reason, created_at
+		FROM   audit_decisions
+		WHERE  claim_id = $1
+		ORDER  BY created_at DESC
+	`, claimID)
+	if err != nil {
+		return nil, fmt.Errorf("list audit history by claim id: %w", err)
+	}
+
+	history, err := pgx.CollectRows(rows, pgx.RowToStructByNameLax[model.AuditDecision])
+	if err != nil {
+		return nil, err
+	}
+
+	return history, nil
+}
+
 func (r *AuditRepository) SaveDecision(
 	ctx context.Context,
 	claimID uuid.UUID,

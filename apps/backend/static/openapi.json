@@ -883,6 +883,68 @@
                       ],
                       "nullable": true
                     },
+                    "auditHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "claimId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "approved",
+                              "flagged",
+                              "rejected"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "citedPolicyText": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "aiModel": {
+                            "type": "string"
+                          },
+                          "deterministicRule": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "overriddenBy": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "overrideReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "claimId",
+                          "decision",
+                          "reason",
+                          "confidence",
+                          "aiModel",
+                          "createdAt"
+                        ]
+                      }
+                    },
                     "policyId": {
                       "type": "string",
                       "format": "uuid",
@@ -918,6 +980,7 @@
                   "required": [
                     "claim",
                     "audit",
+                    "auditHistory",
                     "policyId",
                     "policyChunks"
                   ]
@@ -1186,6 +1249,68 @@
                       ],
                       "nullable": true
                     },
+                    "auditHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "claimId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "decision": {
+                            "type": "string",
+                            "enum": [
+                              "approved",
+                              "flagged",
+                              "rejected"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "citedPolicyText": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "aiModel": {
+                            "type": "string"
+                          },
+                          "deterministicRule": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "overriddenBy": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "overrideReason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "claimId",
+                          "decision",
+                          "reason",
+                          "confidence",
+                          "aiModel",
+                          "createdAt"
+                        ]
+                      }
+                    },
                     "policyId": {
                       "type": "string",
                       "format": "uuid",
@@ -1221,6 +1346,7 @@
                   "required": [
                     "claim",
                     "audit",
+                    "auditHistory",
                     "policyId",
                     "policyChunks"
                   ]
