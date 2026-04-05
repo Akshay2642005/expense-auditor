@@ -7,6 +7,7 @@
 - define API contracts in code
 - generate OpenAPI JSON from those contracts
 - copy generated docs into the backend static folder
+- provide typed contracts to the frontend API layer
 
 ## Inputs And Outputs
 
@@ -24,13 +25,16 @@ The generation logic lives in [src/gen.ts](./src/gen.ts).
 
 ## Current Coverage
 
-The package currently generates contracts centered on:
+The package currently generates contracts for:
 
 - health routes
-- claim routes
-- admin claim review routes
+- member claim routes
+- admin claim queue, detail, override, and recompute routes
+- audit result routes
+- active policy, admin policy list/upload/detail routes
+- organization invitation and member-role update routes
 
-That means OpenAPI coverage is useful today, but not yet complete for every backend endpoint. Policy, organization, and some audit-related routes can still be expanded here.
+Not every backend endpoint is contract-driven yet. Binary download and some direct streaming endpoints still sit outside the current ts-rest contract layer.
 
 ## Build And Generation Commands
 
@@ -89,13 +93,20 @@ bun run gen
 
 ## How It Fits Into The Repo
 
-- backend serves the generated JSON and Swagger UI
-- frontend can rely on the same contract package for typed client work
+- the backend serves the generated JSON and Swagger UI
+- the frontend uses the same contract package for typed client calls
 - docs and runtime schemas stay closer together than a hand-maintained Swagger file
+
+## Current Contract Modules
+
+- [health.ts](./src/contracts/health.ts)
+- [claim.ts](./src/contracts/claim.ts)
+- [audit.ts](./src/contracts/audit.ts)
+- [policy.ts](./src/contracts/policy.ts)
+- [organization.ts](./src/contracts/organization.ts)
 
 ## Recommended Future Work
 
-- add policy route contracts
-- add organization and invitation route contracts
-- add audit response contracts
-- expand description metadata so generated docs become more onboarding-friendly
+- add contract coverage for remaining binary and download routes where it makes sense
+- keep improving summaries and descriptions so generated docs become more onboarding-friendly
+- extend contracts alongside future analytics, export, and notification-center work

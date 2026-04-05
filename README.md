@@ -2,107 +2,104 @@
 
 AI-assisted, policy-first expense auditing for OCR-driven claim review, policy validation, and finance-team oversight.
 
-Expense Auditor is a policy-first expense compliance platform built from the "Policy-First Expense Auditor" PDF brief in this repository. The system combines receipt OCR, policy retrieval, AI-assisted auditing, and an admin review workflow so organizations can move from manual receipt review to a faster, more consistent audit loop.
+Expense Auditor is a monorepo implementation of the product brief in [2.Expense auditor.pdf](./2.Expense%20auditor.pdf). It combines receipt OCR, policy retrieval, automated audit reasoning, and a finance-admin review workflow so organizations can move from manual reimbursement review to a faster and more consistent process.
 
-This monorepo contains:
+## What Ships Today
 
-- a Go backend API and job runner
-- a React frontend for employees and finance admins
-- a shared Zod schema package
-- a shared OpenAPI contract package
+### Employee experience
 
-## Product Summary
+- Custom Clerk sign-in and sign-up flows with CAPTCHA support
+- SSO callback handling and in-app invitation acceptance
+- Organization onboarding and active-org activation
+- Claim submission with `JPG`, `PNG`, or `PDF` receipts
+- Business purpose, expense date, and category capture
+- Claim tracking under `/claims`
+- Claim detail pages with audit explanations and cited policy text
+- Active policy visibility and PDF download for every signed-in member
 
-The product currently supports the core loop:
+### Policy and audit pipeline
 
-1. An employee signs in, joins an organization, and submits a receipt with a business purpose.
-2. The backend stores the file, runs OCR, validates the receipt, and checks for date mismatch or unreadable input.
-3. The organization's active policy PDF is chunked, embedded, and retrieved during audit.
-4. Gemini-based audit logic compares the receipt, the business purpose, and the relevant policy excerpts.
-5. The claim is categorized as approved, flagged, rejected, or routed to manual review.
-6. Admins review claims in a dedicated queue with search, filters, uploader visibility, and claim detail pages.
+- OCR extraction of merchant, amount, currency, and receipt date
+- OCR validation for unreadable receipts and date mismatch
+- Business-purpose consistency checks during the OCR pipeline
+- Policy PDF upload, activation, storage, chunking, embedding, and retrieval
+- Gemini-backed audit decisions using retrieved policy context
+- Claim outcomes across `approved`, `flagged`, `rejected`, and workflow statuses
+- Outcome email notifications for approved, rejected, and clarification-needed claims
 
-## Status Against The PDF Brief
+### Finance-admin workflow
 
-The PDF lives at [2.Expense auditor.pdf](./2.Expense%20auditor.pdf).
+- Dedicated admin routes under `/admin/claims`, `/admin/claims/:id`, `/admin/profile`, and `/admin/policy`
+- Admin review queue with uploader visibility
+- Local search, filter, and sort after the initial authorized admin fetch
+- Admin claim detail workspace with:
+  - receipt preview
+  - receipt snapshot
+  - employee submission metadata
+  - matched policy popup
+  - review history popup
+- Manual reviewer overrides with comments while preserving the original AI audit trail
+- Policy recompute from the admin review page
+- Admin/member invite role selection
+- Admin profile tabs for `Me` and `Members`
+- Promote and demote member roles from the admin profile
 
-### Implemented Now
+## Current Gaps
 
-- Digital receipt ingestion for `JPG`, `PNG`, and `PDF`.
-- OCR extraction of merchant name, receipt date, total amount, and currency.
-- Business purpose capture during claim submission.
-- OCR validation for unreadable receipts and date mismatch handling.
-- Organization-scoped policy upload, activation, visibility, and PDF download.
-- Policy ingestion pipeline using PDF extraction, chunking, embeddings, and pgvector retrieval.
-- Automated policy cross-reference during audit.
-- Business-purpose consistency checking during the OCR / review pipeline.
-- Traffic-light claim outcomes: `approved`, `flagged`, `rejected`, plus intermediate workflow statuses.
-- AI-generated audit explanations and cited policy text on claim detail pages.
-- Admin review queue with uploader visibility, local search, filtering, and sorting.
-- Clerk-based custom auth, SSO callback handling, invitation acceptance, and organization onboarding.
+These are the largest product areas still open relative to the original brief:
 
-### Partially Implemented Or Needs Product Polish
-
-- Finance home page sorted by explicit risk level.
-  Today: admins can sort and filter the queue, but there is no dedicated risk score model yet.
-- Audit detail workspace as a true side-by-side reviewer cockpit.
-  Today: the claim detail page shows the claim, audit result, and supporting information, but not the full "receipt | extracted fields | policy snippet" layout from the brief.
-- Notification system for employee approval / clarification.
-  Today: the repo has email plumbing and invitation flows, but claim-state notification UX is not complete.
-- Human-in-the-loop override and dispute workflow.
-  Today: the brief calls for explicit auditor override comments; this still needs a full backend + UI workflow.
-
-### Future Improvements
-
-- Region-aware and seniority-aware policy enforcement beyond the current cap extraction.
-- Stronger prohibition detection such as alcohol bans, merchant restrictions, and category-specific exceptions.
-- Bulk admin actions, saved searches, and queue presets.
-- Duplicate receipt detection and broader fraud heuristics.
-- Full OpenAPI coverage for policy, audit, and organization endpoints.
-- Stronger evaluation harnesses for OCR quality, retrieval accuracy, and false positive / false negative audit outcomes.
+- explicit risk scoring and risk-first queue ranking
+- analytics and export tooling for finance teams
+- richer policy rule enforcement for region, seniority, exceptions, and explicit prohibitions
+- in-app notification center and notification preferences
+- dispute, reopen, and escalation workflow beyond the current override flow
 
 ## Monorepo Layout
 
 ```text
 expense-auditor/
 |-- apps/
-|   |-- backend/      # Go API, background jobs, migrations, storage, AI pipeline
+|   |-- backend/      # Go API, jobs, storage, OCR, audit, email, migrations
 |   `-- frontend/     # React app for employees and finance admins
 |-- packages/
-|   |-- zod/          # Shared schema definitions and TypeScript types
-|   `-- openapi/      # Shared ts-rest contracts and generated OpenAPI JSON
+|   |-- infra/        # Terraform for a minimal DigitalOcean droplet used with Dokploy
+|   |-- openapi/      # ts-rest contracts + generated OpenAPI output
+|   `-- zod/          # Shared schemas and TypeScript types
+|-- docs/
+|   `-- digitalocean-deployment.md
 |-- 2.Expense auditor.pdf
-|-- package.json
-|-- turbo.json
-`-- README.md
+|-- README.md
+`-- turbo.json
 ```
 
-## Architecture Overview
+## Architecture
 
 ### Backend
 
-- Echo-based REST API
+- Go `1.25`
+- Echo API
 - PostgreSQL + pgvector
 - Redis + Asynq background jobs
-- Google Cloud Storage for uploaded receipts and policy files
-- Gemini for OCR, PDF extraction, embeddings, business-purpose checks, and audit decisions
-- Clerk for authentication and organization-aware authorization
+- Google Cloud Storage for receipts and policy files
+- Gemini for OCR, policy extraction, embedding, business-purpose checks, and audit reasoning
+- Clerk for auth and org-aware authorization
+- Resend for transactional email
 
 ### Frontend
 
-- React 19 + Vite
-- Clerk React for auth
-- React Router for app navigation
-- React Query for server state and caching
-- Shadcn/Radix-style UI building blocks
-- Shared schema and contract packages from `packages/zod` and `packages/openapi`
+- React `19` + Vite
+- React Router
+- React Query
+- Clerk React
+- Shared contracts and schema types from `packages/openapi` and `packages/zod`
 
-### Shared Packages
+### Shared packages
 
-- `@auditor/zod` is the shared source of truth for API response / query shapes.
-- `@auditor/openapi` turns the ts-rest contracts into OpenAPI JSON and syncs a copy into the backend static docs folder.
+- `@auditor/zod` is the shared schema source of truth
+- `@auditor/openapi` defines the contract layer and generates OpenAPI JSON
+- `packages/infra` provisions the minimal DigitalOcean droplet used by the current Dokploy deployment path
 
-## Local Development Setup
+## Local Development
 
 ### Prerequisites
 
@@ -110,8 +107,8 @@ expense-auditor/
 - Node.js `22+`
 - Bun `1.2+`
 - Docker Desktop or another Docker runtime
-- `task` CLI
-- `tern` migration CLI
+- `task`
+- `tern`
 
 Helpful install commands:
 
@@ -120,46 +117,42 @@ go install github.com/go-task/task/v3/cmd/task@latest
 go install github.com/jackc/tern/v2@latest
 ```
 
-### 1. Install Root And Frontend Dependencies
+### 1. Install monorepo dependencies
 
 ```bash
 cd C:\dev\Projects\expense-auditor
 bun install
 ```
 
-### 2. Install Backend Go Dependencies
+### 2. Install backend Go dependencies
 
 ```bash
 cd C:\dev\Projects\expense-auditor\apps\backend
 go mod download
 ```
 
-### 3. Start Local Infrastructure
-
-The backend ships with Docker Compose for Postgres and Redis.
+### 3. Start local Postgres and Redis
 
 ```bash
 cd C:\dev\Projects\expense-auditor\apps\backend
 docker compose up -d
 ```
 
-Default local ports from `compose.yaml`:
+Default local ports:
 
 - PostgreSQL: `localhost:15432`
 - Redis: `localhost:16316`
 
-### 4. Configure Backend Environment
+### 4. Configure the backend
 
-Copy the sample file:
+Copy the sample:
 
 ```bash
 cd C:\dev\Projects\expense-auditor\apps\backend
 Copy-Item .env.sample .env
 ```
 
-Use the sample file as a base, then make sure the values line up with your local frontend and your real service credentials.
-
-At minimum, verify or supply:
+Minimum values to verify:
 
 ```dotenv
 EXPAU_PRIMARY.ENV="local"
@@ -178,6 +171,7 @@ EXPAU_REDIS.ADDRESS="localhost:16316"
 
 EXPAU_AUTH.SECRET_KEY="your-clerk-secret-key"
 EXPAU_INTEGRATION.RESEND_API_KEY="your-resend-api-key"
+EXPAU_INTEGRATION.RESEND_FROM="Expense Auditor <onboarding@your-domain.com>"
 
 EXPAU_AI.GEMINI_API_KEY="your-gemini-api-key"
 EXPAU_AI.DATE_MISMATCH_THRESHOLD="7"
@@ -188,16 +182,9 @@ EXPAU_STORAGE.GCS_CREDENTIALS="path-or-json-for-service-account"
 EXPAU_STORAGE.MAX_FILE_SIZE_MB="10"
 ```
 
-Notes:
+### 5. Configure the frontend
 
-- `EXPAU_SERVER.CORS_ALLOWED_ORIGINS` should match the Vite frontend origin.
-- New Relic is optional for local development; the logger service will run without a license key.
-- Receipt and policy uploads depend on working GCS credentials.
-- AI features depend on a valid Gemini API key.
-
-### 5. Configure Frontend Environment
-
-Create `apps/frontend/.env` if needed and make sure it contains:
+Create `apps/frontend/.env`:
 
 ```dotenv
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_or_pk_live_value
@@ -205,16 +192,14 @@ VITE_API_URL=http://localhost:8080
 VITE_ENV=local
 ```
 
-### 6. Run Database Migrations
+### 6. Run migrations
 
 ```bash
 cd C:\dev\Projects\expense-auditor\apps\backend
 task migrations:up
 ```
 
-### 7. Build Shared Packages Once
-
-The frontend waits for the shared packages to exist, so do an initial build first.
+### 7. Build the shared packages once
 
 ```bash
 cd C:\dev\Projects\expense-auditor\packages\zod
@@ -225,21 +210,16 @@ bun run build
 bun run gen
 ```
 
-### 8. Start The Backend
+### 8. Start the backend
 
 ```bash
 cd C:\dev\Projects\expense-auditor\apps\backend
 task run
 ```
 
-The backend will be available at `http://localhost:8080`.
+The API will be available at `http://localhost:8080`.
 
-Useful endpoints:
-
-- `GET /status`
-- `GET /docs`
-
-### 9. Start The Frontend
+### 9. Start the frontend
 
 Open a second terminal:
 
@@ -248,9 +228,9 @@ cd C:\dev\Projects\expense-auditor
 bun dev
 ```
 
-The Vite frontend typically runs at `http://localhost:5173`.
+The frontend typically runs at `http://localhost:5173`.
 
-## Common Development Commands
+## Common Commands
 
 ### Root
 
@@ -265,9 +245,7 @@ bun lint
 
 ```bash
 cd apps/backend
-task help
 task run
-task migrations:new name=add_something
 task migrations:up
 go test ./...
 ```
@@ -281,7 +259,7 @@ bun run typecheck
 bun run build
 ```
 
-### Shared Packages
+### Shared packages
 
 ```bash
 cd packages/zod
@@ -292,37 +270,36 @@ bun run build
 bun run gen
 ```
 
-## Testing
-
-### Backend
-
-- Unit and service tests: `go test ./...`
-- Integration-style DB tests: use `apps/backend/internal/testing`
-- Container-backed testing requires Docker
-
-### Frontend
-
-- Type safety: `bun run typecheck`
-- Production build verification: `bun run build`
-- Frontend tests can run with `bun run test`
-
 ## Documentation Map
 
-- [Root README](./README.md): product overview, setup, roadmap
-- [Backend README](./apps/backend/README.md): API, jobs, envs, backend architecture
-- [Frontend README](./apps/frontend/README.md): routes, UX flows, frontend setup
-- [Zod README](./packages/zod/README.md): shared schema package
-- [OpenAPI README](./packages/openapi/README.md): contract generation and OpenAPI output
+- [Backend README](./apps/backend/README.md)
+- [Frontend README](./apps/frontend/README.md)
+- [Zod README](./packages/zod/README.md)
+- [OpenAPI README](./packages/openapi/README.md)
+- [Infra README](./packages/infra/README.md)
+- [DigitalOcean + Dokploy Deployment Guide](./docs/digitalocean-deployment.md)
+
+## Deployment
+
+The current documented production path for this repo is:
+
+1. Provision a minimal DigitalOcean droplet with Terraform from `packages/infra`
+2. Install Dokploy on that droplet
+3. Run PostgreSQL + pgvector and Redis as a Dokploy compose stack
+4. Deploy the frontend and backend as separate Dokploy applications
+
+See:
+
+- [packages/infra/README.md](./packages/infra/README.md)
+- [docs/digitalocean-deployment.md](./docs/digitalocean-deployment.md)
 
 ## Recommended Next Product Steps
 
-If you want to finish the original PDF brief with the highest leverage work next, focus here:
-
-1. Add explicit auditor override comments and a dispute workflow.
-2. Introduce risk scoring so admins see truly high-risk claims first.
-3. Build the side-by-side audit detail workspace from the brief.
-4. Add claim approval / clarification notifications.
-5. Expand policy rule extraction beyond basic caps and text snippets.
+1. Add risk scoring and rank the admin queue by risk by default.
+2. Add analytics, CSV export, and saved review views for finance admins.
+3. Expand policy enforcement beyond caps and retrieved text into structured rule categories.
+4. Add an in-app notification center and user-facing notification preferences.
+5. Add reopen, escalation, and dispute handling on top of the current override trail.
 
 ## License
 

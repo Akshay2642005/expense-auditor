@@ -1,22 +1,48 @@
-### Building and running your application
+# Docker Notes
 
-When you're ready, start your application by running:
-`docker compose up --build`.
+This repository does not use a single root `docker compose` application for the whole monorepo.
 
-Your application will be available at http://localhost:4173.
+## Local Docker Usage
 
-### Deploying your application to the cloud
+For local development, Docker is primarily used to run the backend data dependencies from [apps/backend/compose.yaml](./apps/backend/compose.yaml):
 
-First, build your image, e.g.: `docker build -t myapp .`.
-If your cloud uses a different CPU architecture than your development
-machine (e.g., you are on a Mac M1 and your cloud provider is amd64),
-you'll want to build the image for that platform, e.g.:
-`docker build --platform=linux/amd64 -t myapp .`.
+```bash
+cd C:\dev\Projects\expense-auditor\apps\backend
+docker compose up -d
+```
 
-Then, push it to your registry, e.g. `docker push myregistry.com/myapp`.
+That starts:
 
-Consult Docker's [getting started](https://docs.docker.com/go/get-started-sharing/)
-docs for more detail on building and pushing.
+- PostgreSQL with pgvector on `localhost:15432`
+- Redis on `localhost:16316`
 
-### References
-* [Docker's Node.js guide](https://docs.docker.com/language/nodejs/)
+## Production Container Story
+
+The current production deployment path documented in this repo is:
+
+- a DigitalOcean droplet provisioned from `packages/infra`
+- Dokploy installed on that droplet
+- separate Dokploy applications for:
+  - the frontend
+  - the backend
+- a Dokploy compose stack for PostgreSQL and Redis
+
+## Build Inputs Used By Dokploy
+
+### Frontend
+
+- build path: repository root
+- config: [nixpacks.toml](./nixpacks.toml)
+- runtime app: `apps/frontend`
+
+### Backend
+
+- build path: `apps/backend`
+- config: [apps/backend/nixpacks.toml](./apps/backend/nixpacks.toml)
+- optional manual Docker build path: [apps/backend/Dockerfile](./apps/backend/Dockerfile)
+
+## Recommended References
+
+- [Root README](./README.md)
+- [Infra README](./packages/infra/README.md)
+- [DigitalOcean + Dokploy Deployment Guide](./docs/digitalocean-deployment.md)

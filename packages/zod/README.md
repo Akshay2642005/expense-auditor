@@ -1,29 +1,46 @@
 # @auditor/zod
 
-`@auditor/zod` is the shared schema package for the monorepo. It defines the canonical Zod models and the derived TypeScript types used by the frontend and the OpenAPI contract layer.
+`@auditor/zod` is the shared schema package for the monorepo. It defines the canonical Zod models and derived TypeScript types used by the frontend and the contract-generation layer.
 
 ## Why This Package Exists
 
-This package keeps the frontend and contract generation layer aligned on:
+This package keeps the frontend and the OpenAPI contract layer aligned on:
 
-- claim status enums
-- request query shapes
-- response payload shapes
-- shared domain concepts such as policy, audit, and health data
+- claim lifecycle states
+- request and response payloads
+- admin review shapes
+- policy models
+- audit history and override models
+- organization invitation and role-management payloads
 
-Without this package, the frontend and API contracts would drift over time.
+Without this package, the UI and the contract layer would drift over time.
 
 ## Current Exports
 
 The package currently exports schemas from:
 
+- `utils.ts`
 - `health.ts`
 - `claim.ts`
 - `policy.ts`
 - `audit.ts`
-- `utils.ts`
+- `organization.ts`
 
 The main entrypoint is [src/index.ts](./src/index.ts).
+
+## Current Scope
+
+The package currently covers shared domain objects for:
+
+- health responses
+- claim status, categories, list/detail payloads, and admin claim queries
+- admin claim detail responses including policy chunks and audit history
+- reviewer override request payloads
+- policy list and active-policy payloads
+- audit responses including human override metadata
+- organization invitations and member role update payloads
+
+It does not replace backend validation by itself. Backend handler and service validation remain the enforcement layer.
 
 ## Build And Development
 
@@ -38,7 +55,7 @@ Watch mode:
 bun run dev
 ```
 
-Clean build artifacts:
+Clean artifacts:
 
 ```bash
 bun run clean
@@ -47,19 +64,32 @@ bun run clean
 ## How It Fits Into The Monorepo
 
 - `apps/frontend` imports runtime-safe types and schemas from this package.
-- `packages/openapi` imports these schemas to build the API contract and generated OpenAPI JSON.
+- `packages/openapi` imports these schemas to build the ts-rest contract and generated OpenAPI JSON.
 
-## Example: Claim Models
+## Example Areas Covered Today
 
-The claim schema currently includes:
+### Claims
 
-- claim status enum
-- expense category enum
-- submit-claim response shape
-- admin claim filter query shape
-- claim response model
+- `ZClaimStatus`
+- `ZExpenseCategory`
+- `ZSubmitClaimResponse`
+- `ZClaimResponse`
+- `ZAdminClaimListQuery`
+- `ZAdminClaimDetailResponse`
 
-That makes this package the source of truth for admin queue filter options and claim lifecycle states.
+### Audit
+
+- `ZAuditDecisionStatus`
+- `ZAuditResponse`
+- `ZAdminClaimOverrideRequest`
+
+### Organization
+
+- `ZOrganizationRole`
+- `ZCreateOrganizationInvitationRequest`
+- `ZCreateOrganizationInvitationResponse`
+- `ZUpdateOrganizationMembershipRoleRequest`
+- `ZUpdateOrganizationMembershipRoleResponse`
 
 ## When To Update This Package
 
@@ -67,8 +97,9 @@ Update `@auditor/zod` when:
 
 - a response payload changes
 - a new claim status is added
-- an admin filter gains a new query option
-- audit or policy payloads change shape
+- admin review data changes shape
+- a new organization or policy payload is shared across apps
+- a contract needs a reusable request schema
 
 ## Recommended Change Workflow
 
@@ -79,19 +110,8 @@ Update `@auditor/zod` when:
 5. Regenerate OpenAPI JSON if contract output changes.
 6. Update frontend consumers.
 
-## Current Scope
-
-This package already covers the core shared domain objects for:
-
-- claims
-- policies
-- audits
-- health
-
-It does not replace backend validation by itself. Backend handler and service validation still remain the enforcement layer.
-
 ## Future Improvements
 
-- add more explicit request schemas for policy and organization routes
-- add schema-level metadata comments for clearer generated docs
-- expand shared types around reviewer overrides and dispute flows once those features ship
+- add richer schema metadata for better generated API descriptions
+- add more explicit non-JSON route helpers where downloads or multipart flows need clearer shared typing
+- keep expanding policy and notification-related shared payloads as those features grow
