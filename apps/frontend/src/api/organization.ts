@@ -3,11 +3,19 @@ import {
   getApiErrorMessage,
   useApiClient,
 } from "@/api/index";
-import type { CreateOrganizationInvitationResponse } from "@auditor/zod";
+import type {
+  CreateOrganizationInvitationResponse,
+  UpdateOrganizationMembershipRoleResponse,
+} from "@auditor/zod";
 
 type CreateInvitationInput = {
   emailAddress: string;
   role?: "org:member" | "org:admin";
+};
+
+type UpdateMembershipRoleInput = {
+  userId: string;
+  role: "org:member" | "org:admin";
 };
 
 export function useOrganizationApi() {
@@ -33,10 +41,32 @@ export function useOrganizationApi() {
     [api],
   );
 
+  const updateMembershipRole = useCallback(
+    async ({
+      userId,
+      role,
+    }: UpdateMembershipRoleInput): Promise<UpdateOrganizationMembershipRoleResponse> => {
+      const response = await api.Organization.updateMembershipRole({
+        params: { userId },
+        body: { role },
+      });
+
+      if (response.status === 200) {
+        return response.body;
+      }
+
+      throw new Error(
+        getApiErrorMessage(response.body, "Failed to update member role"),
+      );
+    },
+    [api],
+  );
+
   return useMemo(
     () => ({
       createInvitation,
+      updateMembershipRole,
     }),
-    [createInvitation],
+    [createInvitation, updateMembershipRole],
   );
 }

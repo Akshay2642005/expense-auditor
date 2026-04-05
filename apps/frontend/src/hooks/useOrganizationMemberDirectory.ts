@@ -19,6 +19,7 @@ type OrganizationMembershipPage = {
 };
 
 export type OrganizationMemberDirectoryEntry = {
+  userId: string;
   email: string | null;
   fullName: string | null;
   role: string | null;
@@ -78,6 +79,7 @@ export function useOrganizationMemberDirectory(enabled = true) {
           if (!publicUserData?.userId) continue;
 
           directory[publicUserData.userId] = {
+            userId: publicUserData.userId,
             email: publicUserData.identifier || null,
             fullName: buildFullName(publicUserData),
             role: membership.role ?? null,

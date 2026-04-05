@@ -10,6 +10,7 @@ import (
 	"github.com/Akshay2642005/expense-auditor/internal/server"
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/organizationinvitation"
+	"github.com/clerk/clerk-sdk-go/v2/organizationmembership"
 )
 
 type AuthService struct {
@@ -22,6 +23,11 @@ type CreateOrganizationInvitationOutput struct {
 	Role         string `json:"role"`
 	Status       string `json:"status"`
 	RedirectURL  string `json:"redirectUrl"`
+}
+
+type UpdateOrganizationMembershipRoleOutput struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
 }
 
 func NewAuthService(s *server.Server) *AuthService {
@@ -67,6 +73,40 @@ func (s *AuthService) CreateOrganizationInvitation(
 		Role:         invitation.Role,
 		Status:       invitation.Status,
 		RedirectURL:  redirectURL,
+	}, nil
+}
+
+func (s *AuthService) UpdateOrganizationMembershipRole(
+	ctx context.Context,
+	orgID string,
+	targetUserID string,
+	role string,
+) (*UpdateOrganizationMembershipRoleOutput, error) {
+	switch role {
+	case "org:member", "org:admin":
+	default:
+		return nil, errs.NewBadRequestError("role must be either org:member or org:admin", true, nil, nil, nil)
+	}
+
+	params := &organizationmembership.UpdateParams{
+		OrganizationID: orgID,
+		UserID:         targetUserID,
+		Role:           &role,
+	}
+
+	membership, err := organizationmembership.Update(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("update organization membership role: %w", err)
+	}
+
+	userID := targetUserID
+	if membership.PublicUserData != nil && membership.PublicUserData.UserID != "" {
+		userID = membership.PublicUserData.UserID
+	}
+
+	return &UpdateOrganizationMembershipRoleOutput{
+		UserID: userID,
+		Role:   membership.Role,
 	}, nil
 }
 

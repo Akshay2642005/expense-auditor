@@ -23,4 +23,13 @@ func registerOrganizationRoutes(g *echo.Group, h *handler.Handlers) {
 			&handler.CreateOrganizationInvitationRequest{},
 		)(c)
 	})
+
+	admin.PATCH("/members/:userId/role", func(c echo.Context) error {
+		return handler.Handle(
+			h.Organization.Handler,
+			h.Organization.UpdateMembershipRole,
+			http.StatusOK,
+			&handler.UpdateOrganizationMembershipRoleRequest{},
+		)(c)
+	})
 }

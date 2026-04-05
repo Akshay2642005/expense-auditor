@@ -68,3 +68,46 @@ func (h *OrganizationHandler) CreateInvitation(c echo.Context, req *CreateOrgani
 		req.Role,
 	)
 }
+
+type UpdateOrganizationMembershipRoleRequest struct {
+	Role string `json:"role"`
+}
+
+func (r *UpdateOrganizationMembershipRoleRequest) Validate() error {
+	switch r.Role {
+	case "org:member", "org:admin":
+		return nil
+	case "":
+		return errs.NewBadRequestError("role is required", true, nil, nil, nil)
+	default:
+		return errs.NewBadRequestError("role must be either org:member or org:admin", true, nil, nil, nil)
+	}
+}
+
+func (h *OrganizationHandler) UpdateMembershipRole(c echo.Context, req *UpdateOrganizationMembershipRoleRequest) (any, error) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return nil, errs.NewUnauthorizedError("unauthorized", false)
+	}
+
+	orgID := middleware.GetOrgID(c)
+	if orgID == "" {
+		return nil, errs.NewForbiddenError("active organization required", false)
+	}
+
+	targetUserID := c.Param("userId")
+	if targetUserID == "" {
+		return nil, errs.NewBadRequestError("userId is required", true, nil, nil, nil)
+	}
+
+	if targetUserID == userID {
+		return nil, errs.NewForbiddenError("you cannot change your own role from this page", true)
+	}
+
+	return h.authService.UpdateOrganizationMembershipRole(
+		c.Request().Context(),
+		orgID,
+		targetUserID,
+		req.Role,
+	)
+}

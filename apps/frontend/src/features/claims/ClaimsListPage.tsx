@@ -1,6 +1,6 @@
 import { useClaimsApi } from "@/api/claims";
-import { useOrganizationApi } from "@/api/organization";
 import { usePolicyApi } from "@/api/policy";
+import { OrganizationInviteForm } from "@/components/organization/OrganizationInviteForm";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { AdminFiltersPanel } from "@/features/claims/components/list/AdminFiltersPanel";
 import { ClaimsResultsSection } from "@/features/claims/components/list/ClaimsResultsSection";
 import {
@@ -31,7 +29,7 @@ import { useAdminClaimFilters } from "@/features/claims/hooks/useAdminClaimFilte
 import { useActiveOrganizationReady } from "@/hooks/useActiveOrganizationReady";
 import { useOrganizationMemberDirectory } from "@/hooks/useOrganizationMemberDirectory";
 import { cn } from "@/lib/utils";
-import { useAuth, useClerk, useOrganization, useUser } from "@clerk/clerk-react";
+import { useAuth, useClerk, useUser } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -45,7 +43,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 
 export function ClaimsListPage({
   routeMode,
@@ -55,19 +52,15 @@ export function ClaimsListPage({
   const navigate = useNavigate();
   const { user } = useUser();
   const { orgRole, isLoaded: authLoaded, isSignedIn } = useAuth();
-  const { organization } = useOrganization();
   const { signOut } = useClerk();
   const { listClaims, listAdminClaims } = useClaimsApi();
   const { getActivePolicy } = usePolicyApi();
-  const { createInvitation } = useOrganizationApi();
   const {
     orgId: activeOrgId,
     isReady: isActiveOrgReady,
     isWaitingForActivation: isWaitingForActiveOrg,
   } = useActiveOrganizationReady();
 
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviting, setInviting] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const authIsAdmin = orgRole === "org:admin";
@@ -128,26 +121,6 @@ export function ClaimsListPage({
   const handleSignOut = async () => {
     await signOut();
     navigate("/login", { replace: true });
-  };
-
-  const handleInvite = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!organization || !inviteEmail.trim()) return;
-
-    setInviting(true);
-    try {
-      await createInvitation({
-        emailAddress: inviteEmail.trim(),
-        role: "org:member",
-      });
-      toast.success(`Invite sent to ${inviteEmail.trim()}`);
-      setInviteEmail("");
-      setInviteOpen(false);
-    } catch {
-      toast.error("Failed to send invite.");
-    } finally {
-      setInviting(false);
-    }
   };
 
   const policyPath = orgRole === "org:admin" ? "/admin/policy" : "/policy";
@@ -246,30 +219,11 @@ export function ClaimsListPage({
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-sm">
                   <DialogHeader>
-                    <DialogTitle>Invite team member</DialogTitle>
+                  <DialogTitle>Invite team member</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleInvite} className="space-y-4 pt-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="invite-email">Email address</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        placeholder="colleague@company.com"
-                        value={inviteEmail}
-                        onChange={(event) => setInviteEmail(event.target.value)}
-                        required
-                        disabled={inviting}
-                        autoFocus
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={inviting || !inviteEmail.trim()}
-                    >
-                      {inviting ? "Sending…" : "Send invite"}
-                    </Button>
-                  </form>
+                  <div className="pt-2">
+                    <OrganizationInviteForm onInvited={() => setInviteOpen(false)} />
+                  </div>
                 </DialogContent>
               </Dialog>
             )}

@@ -21,3 +21,18 @@ export const ZCreateOrganizationInvitationResponse = z.object({
 export type CreateOrganizationInvitationResponse = z.infer<
   typeof ZCreateOrganizationInvitationResponse
 >;
+
+export const ZUpdateOrganizationMembershipRoleRequest = z.object({
+  role: ZOrganizationRole,
+});
+export type UpdateOrganizationMembershipRoleRequest = z.infer<
+  typeof ZUpdateOrganizationMembershipRoleRequest
+>;
+
+export const ZUpdateOrganizationMembershipRoleResponse = z.object({
+  userId: z.string(),
+  role: ZOrganizationRole,
+});
+export type UpdateOrganizationMembershipRoleResponse = z.infer<
+  typeof ZUpdateOrganizationMembershipRoleResponse
+>;

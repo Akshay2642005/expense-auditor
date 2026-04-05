@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   ZCreateOrganizationInvitationRequest,
   ZCreateOrganizationInvitationResponse,
+  ZUpdateOrganizationMembershipRoleRequest,
+  ZUpdateOrganizationMembershipRoleResponse,
 } from "@auditor/zod";
 
 const c = initContract();
@@ -19,6 +21,21 @@ export const organizationContract = c.router({
     body: ZCreateOrganizationInvitationRequest,
     responses: {
       201: ZCreateOrganizationInvitationResponse,
+      400: ZErrorResponse,
+      401: ZErrorResponse,
+      403: ZErrorResponse,
+    },
+  },
+  updateMembershipRole: {
+    summary: "Update an organization member role",
+    method: "PATCH",
+    path: "/v1/admin/organization/members/:userId/role",
+    pathParams: z.object({
+      userId: z.string(),
+    }),
+    body: ZUpdateOrganizationMembershipRoleRequest,
+    responses: {
+      200: ZUpdateOrganizationMembershipRoleResponse,
       400: ZErrorResponse,
       401: ZErrorResponse,
       403: ZErrorResponse,
