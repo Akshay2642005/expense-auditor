@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -54,6 +55,35 @@ func (s *AuthService) CreateOrganizationInvitation(
 		role = "org:member"
 	}
 
+	emailAddress = normalizeInvitationEmail(emailAddress)
+
+	existingInvitation, err := s.findPendingOrganizationInvitationByEmail(
+		ctx,
+		orgID,
+		emailAddress,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if existingInvitation != nil {
+		if existingInvitation.Role == role {
+			return buildCreateOrganizationInvitationOutput(existingInvitation, redirectURL), nil
+		}
+
+		return nil, errs.NewBadRequestError(
+			fmt.Sprintf(
+				"%s already has a pending %s invitation. Wait for it to be accepted or expire before sending a different role.",
+				emailAddress,
+				readableOrganizationRole(existingInvitation.Role),
+			),
+			true,
+			nil,
+			nil,
+			nil,
+		)
+	}
+
 	params := &organizationinvitation.CreateParams{
 		OrganizationID: orgID,
 		EmailAddress:   &emailAddress,
@@ -64,16 +94,20 @@ func (s *AuthService) CreateOrganizationInvitation(
 
 	invitation, err := organizationinvitation.Create(ctx, params)
 	if err != nil {
+		if apiErr, ok := err.(*clerk.APIErrorResponse); ok && apiErr.HTTPStatusCode == http.StatusTooManyRequests {
+			return nil, errs.NewBadRequestError(
+				buildInvitationRateLimitMessage(apiErr),
+				true,
+				nil,
+				nil,
+				nil,
+			)
+		}
+
 		return nil, fmt.Errorf("create organization invitation: %w", err)
 	}
 
-	return &CreateOrganizationInvitationOutput{
-		ID:           invitation.ID,
-		EmailAddress: invitation.EmailAddress,
-		Role:         invitation.Role,
-		Status:       invitation.Status,
-		RedirectURL:  redirectURL,
-	}, nil
+	return buildCreateOrganizationInvitationOutput(invitation, redirectURL), nil
 }
 
 func (s *AuthService) UpdateOrganizationMembershipRole(
@@ -165,4 +199,77 @@ func sanitizeOrigin(value string) string {
 	}
 
 	return strings.TrimRight(parsed.Scheme+"://"+parsed.Host, "/")
+}
+
+func normalizeInvitationEmail(emailAddress string) string {
+	return strings.ToLower(strings.TrimSpace(emailAddress))
+}
+
+func readableOrganizationRole(role string) string {
+	if role == "org:admin" {
+		return "admin"
+	}
+
+	return "member"
+}
+
+func buildCreateOrganizationInvitationOutput(
+	invitation *clerk.OrganizationInvitation,
+	redirectURL string,
+) *CreateOrganizationInvitationOutput {
+	return &CreateOrganizationInvitationOutput{
+		ID:           invitation.ID,
+		EmailAddress: invitation.EmailAddress,
+		Role:         invitation.Role,
+		Status:       invitation.Status,
+		RedirectURL:  redirectURL,
+	}
+}
+
+func buildInvitationRateLimitMessage(apiErr *clerk.APIErrorResponse) string {
+	message := "Too many invitation requests were sent to Clerk. Please try again in a bit."
+	if apiErr == nil || apiErr.Response == nil {
+		return message
+	}
+
+	if retryAfter := strings.TrimSpace(apiErr.Response.Header.Get("Retry-After")); retryAfter != "" {
+		return fmt.Sprintf(
+			"Too many invitation requests were sent to Clerk. Please wait about %s seconds before trying again.",
+			retryAfter,
+		)
+	}
+
+	return message
+}
+
+func (s *AuthService) findPendingOrganizationInvitationByEmail(
+	ctx context.Context,
+	orgID string,
+	emailAddress string,
+) (*clerk.OrganizationInvitation, error) {
+	statuses := []string{"pending"}
+	limit := int64(100)
+
+	list, err := organizationinvitation.List(ctx, &organizationinvitation.ListParams{
+		OrganizationID: orgID,
+		Statuses:       &statuses,
+		ListParams: clerk.ListParams{
+			Limit: &limit,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list organization invitations: %w", err)
+	}
+
+	for _, invitation := range list.OrganizationInvitations {
+		if invitation == nil {
+			continue
+		}
+
+		if normalizeInvitationEmail(invitation.EmailAddress) == emailAddress {
+			return invitation, nil
+		}
+	}
+
+	return nil, nil
 }

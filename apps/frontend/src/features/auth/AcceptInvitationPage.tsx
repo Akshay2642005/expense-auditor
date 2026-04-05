@@ -11,6 +11,33 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ClerkCaptcha } from "./ClerkCaptcha";
 import { getClerkError } from "./utils";
 
+type SignInResource = NonNullable<ReturnType<typeof useSignIn>["signIn"]>;
+type SignInAttemptResult = Awaited<ReturnType<SignInResource["create"]>>;
+
+const invitationSignInAttempts = new Map<string, Promise<SignInAttemptResult>>();
+
+function runInvitationSignIn(
+  ticket: string,
+  signIn: SignInResource,
+): Promise<SignInAttemptResult> {
+  const existingAttempt = invitationSignInAttempts.get(ticket);
+  if (existingAttempt) {
+    return existingAttempt;
+  }
+
+  const attempt = signIn
+    .create({
+      strategy: "ticket",
+      ticket,
+    })
+    .finally(() => {
+      invitationSignInAttempts.delete(ticket);
+    });
+
+  invitationSignInAttempts.set(ticket, attempt);
+  return attempt;
+}
+
 export function AcceptInvitationPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -65,10 +92,7 @@ export function AcceptInvitationPage() {
     const acceptInvitation = async () => {
       setSigningIn(true);
       try {
-        const result = await signIn.create({
-          strategy: "ticket",
-          ticket,
-        });
+        const result = await runInvitationSignIn(ticket, signIn);
 
         if (cancelled) return;
 
