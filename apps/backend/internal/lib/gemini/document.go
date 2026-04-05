@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	pdfExtractionModel = "gemini-embedding-001"
+	// PDF extraction needs a generative model because this code path uses`r`n`t// GenerateContent over an uploaded Files API asset.`r`n`t
+	pdfExtractionModel = "gemini-3.1-pro-preview"
 
 	// fileStatePollInterval is how long to wait between Files API state polls.
 	fileStatePollInterval = 2 * time.Second
@@ -50,7 +51,7 @@ func (c *Client) ExtractPDFText(ctx context.Context, pdfBytes []byte) (map[int]s
 	// 1. Upload PDF via Files API.
 	uploaded, err := c.gc.Files.Upload(ctx, bytes.NewReader(pdfBytes), &genai.UploadFileConfig{
 		MIMEType:    "application/pdf",
-		DisplayName: "expense-receipt.pdf",
+		DisplayName: "expense-policy.pdf",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("gemini: files upload: %w", err)

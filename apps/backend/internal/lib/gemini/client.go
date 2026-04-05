@@ -9,7 +9,7 @@ import (
 
 // Client wraps the Gemini generative AI SDK and exposes:
 //   - GenerativeModel calls (OCR via ExtractReceiptData)
-//   - EmbeddingModel calls (text-embedding-004 via EmbedText / EmbedAll)
+//   - EmbeddingModel calls (gemini-embedding-001 via EmbedText / EmbedAll)
 //   - Files API calls (PDF extraction via ExtractPDFText)
 //
 // A single *Client is safe for concurrent use and should be shared across

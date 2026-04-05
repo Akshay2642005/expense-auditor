@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	embeddingModel    = "gemini-embedding-001"
+	embeddingModel    = "gemini-embedding-2-preview"
 	maxEmbeddingBatch = 20 // Gemini API hard limit per batch request
 )
 
