@@ -4,6 +4,72 @@ AI-assisted, policy-first expense auditing for OCR-driven claim review, policy v
 
 Expense Auditor is a monorepo implementation of the product brief in [2.Expense auditor.pdf](./2.Expense%20auditor.pdf). It combines receipt OCR, policy retrieval, automated audit reasoning, and a finance-admin review workflow so organizations can move from manual reimbursement review to a faster and more consistent process.
 
+## Project Title
+
+Expense Auditor
+
+## The Problem
+
+Expense reimbursement review is often slow, inconsistent, and difficult to scale. Finance teams have to manually inspect receipts, compare them against policy PDFs, and decide whether a claim should be approved, flagged, or rejected, which creates delays and leaves room for human error or policy drift.
+
+## The Solution
+
+Expense Auditor solves this by combining OCR, policy retrieval, and AI-assisted auditing into a single workflow for employees and finance admins. Employees can submit receipt-backed claims, the backend extracts and evaluates the receipt against the active policy, and admins can review, override, and audit the final decision inside a dedicated review workspace.
+
+## Tech Stack
+
+### Programming Languages
+
+- Go
+- TypeScript
+
+### Frontend
+
+- React 19
+- Vite
+- React Router
+- React Query
+- Clerk React
+
+### Backend
+
+- Go
+- Echo
+- Asynq
+
+### Databases And State
+
+- PostgreSQL
+- pgvector
+- Redis
+
+### APIs And Third-Party Tools
+
+- Gemini API
+- Google Cloud Storage
+- Clerk
+- Resend
+- Terraform
+- Dokploy
+
+## Screenshots
+
+### Admin review queue
+
+![Admin review queue](./docs/screenshots/admin-dashboard.png)
+
+### Claim review workspace
+
+![Approved claim detail](./docs/screenshots/claim-approved.png)
+
+### Invitation flow
+
+![Invite flow](./docs/screenshots/invite-flow.png)
+
+### Policy administration
+
+![Policy admin page](./docs/screenshots/policy-admin-page.png)
+
 ## What Ships Today
 
 ### Employee experience

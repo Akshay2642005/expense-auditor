@@ -4,6 +4,10 @@ This package holds the minimal Terraform workspace used to provision the Digital
 
 It is intentionally small: today it provisions a single droplet. Dokploy installation, panel setup, Docker workloads, PostgreSQL, Redis, domains, and application deployment happen after Terraform apply.
 
+## Deployment Snapshot
+
+![Dokploy deployment overview](../../docs/screenshots/app-deploy-digitalocean-dokploy.png)
+
 ## What This Terraform Workspace Provisions
 
 - one DigitalOcean droplet

@@ -91,6 +91,32 @@ Defined in [App.tsx](./src/App.tsx):
 - sorting by submitted date, claimed date, amount, status, or merchant
 - compact review filter rail
 
+## UI Screenshots
+
+### Admin review queue
+
+![Admin review queue](../../docs/screenshots/admin-dashboard.png)
+
+### Claim review workspace
+
+![Claim detail workspace](../../docs/screenshots/claim-approved.png)
+
+### Admin profile: Me tab
+
+![Admin profile me tab](../../docs/screenshots/user-profile.png)
+
+### Admin profile: Members tab
+
+![Admin profile members tab](../../docs/screenshots/organisation-members.png)
+
+### Invite flow
+
+![Invite flow](../../docs/screenshots/invite-flow.png)
+
+### Policy admin
+
+![Policy admin page](../../docs/screenshots/policy-admin-page.png)
+
 ## Frontend Architecture
 
 ### State and data
