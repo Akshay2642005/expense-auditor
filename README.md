@@ -18,57 +18,22 @@ Expense Auditor solves this by combining OCR, policy retrieval, and AI-assisted 
 
 ## Tech Stack
 
-### Programming Languages
-
-- Go
-- TypeScript
-
-### Frontend
-
-- React 19
-- Vite
-- React Router
-- React Query
-- Clerk React
-
-### Backend
-
-- Go
-- Echo
-- Asynq
-
-### Databases And State
-
-- PostgreSQL
-- pgvector
-- Redis
-
-### APIs And Third-Party Tools
-
-- Gemini API
-- Google Cloud Storage
-- Clerk
-- Resend
-- Terraform
-- Dokploy
+| Category | Technologies |
+| --- | --- |
+| Programming Languages | Go, TypeScript |
+| Frontend | React 19, Vite, React Router, React Query, Clerk React |
+| Backend | Go, Echo, Asynq |
+| Databases And State | PostgreSQL, pgvector, Redis |
+| APIs And Third-Party Tools | Gemini API, Google Cloud Storage, Clerk, Resend, Terraform, Dokploy |
 
 ## Screenshots
 
-### Admin review queue
-
-![Admin review queue](./docs/screenshots/admin-dashboard.png)
-
-### Claim review workspace
-
-![Approved claim detail](./docs/screenshots/claim-approved.png)
-
-### Invitation flow
-
-![Invite flow](./docs/screenshots/invite-flow.png)
-
-### Policy administration
-
-![Policy admin page](./docs/screenshots/policy-admin-page.png)
+| Area | Preview |
+| --- | --- |
+| Admin review queue | ![Admin review queue](./docs/screenshots/admin-dashboard.png) |
+| Claim review workspace | ![Approved claim detail](./docs/screenshots/claim-approved.png) |
+| Invitation flow | ![Invite flow](./docs/screenshots/invite-flow.png) |
+| Policy administration | ![Policy admin page](./docs/screenshots/policy-admin-page.png) |
 
 ## What Ships Today
 
